@@ -3,7 +3,6 @@ services:
     image: solr:8.11.2
     ports:
       - "8983:8983"
-    networks: [search]
     environment:
       # 供 Solr（容器内）连接 ZK，用容器名和默认2181端口
       ZK_HOST: "zoo:2181/ENGCD-search/cluster1"
@@ -16,12 +15,7 @@ services:
 
   zoo:
     image: zookeeper:3.9
-    networks: [search]
     ports:
       - "2182:2181"   # 对外暴露：主机2182 -> 容器2181
     environment:
       ZOO_4LW_COMMANDS_WHITELIST: "mntr,conf,ruok"
-
-networks:
-  search:
-    driver: bridge
