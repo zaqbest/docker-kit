@@ -126,18 +126,16 @@ services:
     env_file:
       - env/zoo.env
   # ─── Vaultwarden  ──────────────────────────────────────────────────────────
-  vaultwarden:
+  vault:
     image: vaultwarden/server:latest
     container_name: vaultwarden
     restart: always
     ports:
       - 127.0.0.1:6666:80             # 仅监听本地端口，由反向代理访问
     environment:
-      DOMAIN: "${VAULT_DOMAIN}" # 将这里替换为你的实际域名
+      DOMAIN: https://vault.zaqbest.com # 将这里替换为你的实际域名
       WEBSOCKET_ENABLED: "true"       # 开启 WebSocket，用于客户端实时同步
       # SIGNUPS_ALLOWED: "false"      # 关闭公开注册，生效需要删除前面的 #
       INVITATIONS_ALLOWED: "false"    # 关闭邀请功能
     volumes:
-      - ./vaultwarden/data:/data
-    env_file:
-      - env/vaultwarden.env
+      - ./vault/data:/data
