@@ -15,8 +15,8 @@ services:
       - "8302:8302"      # Serf WAN
       - "8302:8302/udp"  # Serf WAN (UDP)
     volumes:
-      - ./consul_standalone/data:/consul/data
-      - ./consul_standalone/config:/consul/config
+      - ./data/consul_standalone/data:/consul/data
+      - ./data/consul_standalone/config:/consul/config
     env_file:
       - env/consul.env
     command: "agent -server -ui -node=server-1 -bootstrap-expect=1 -client=0.0.0.0"
@@ -36,7 +36,7 @@ services:
   kafka_zk:
     image: wurstmeister/zookeeper
     volumes:
-      - ./kafka/zk_data:/data
+      - ./data/kafka/zk_data:/data
     ports:
       - '2181:2181'
 
@@ -47,7 +47,7 @@ services:
     privileged: true
     command: ["mysqld"]
     volumes:
-      - ./mysql/data/:/var/lib/mysql
+      - ./data/mysql/data/:/var/lib/mysql
       - ./mysql/conf.d:/etc/mysql/conf.d
       - ./mysql/my.cnf:/etc/mysql/my.cnf
     ports:
@@ -86,7 +86,7 @@ services:
     env_file:
       - env/nexus.env
     volumes:
-      - ./nexus/data:/nexus-data
+      - ./data/nexus/data:/nexus-data
     ports:
       - "8081:8081"
       - "8085:8085"
@@ -97,7 +97,7 @@ services:
     container_name: rabbitmq
     privileged: true
     volumes:
-      - ./rabbitmq/data:/var/lib/rabbitmq
+      - ./data/rabbitmq/data:/var/lib/rabbitmq
     ports:
       - "5672:5672"
       - "15672:15672"
@@ -138,4 +138,4 @@ services:
       # SIGNUPS_ALLOWED: "false"      # 关闭公开注册，生效需要删除前面的 #
       INVITATIONS_ALLOWED: "false"    # 关闭邀请功能
     volumes:
-      - ./vault/data:/data
+      - ./data/vault/data:/data
