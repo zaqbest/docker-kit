@@ -141,17 +141,3 @@ services:
       INVITATIONS_ALLOWED: "false"    # 关闭邀请功能
     volumes:
       - ./data/vault/data:/data
-  gitea:
-    image: docker.gitea.com/gitea:1.26.2
-    container_name: gitea
-    environment:
-      - USER_UID=1000
-      - USER_GID=1000
-    restart: always
-    volumes:
-      - ./data/gitea:/data
-      - /etc/timezone:/etc/timezone:ro
-      - /etc/localtime:/etc/localtime:ro
-    ports:
-      - "3000:3000"
-      - "2222:22"
