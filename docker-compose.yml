@@ -88,7 +88,7 @@ services:
     volumes:
       - ./data/nexus/data:/nexus-data
       - ./nexus/nexus.vmoptions:/opt/sonatype/nexus/bin/nexus.vmoptions:ro
-    mem_limit: 1700m
+    mem_limit: 1200m
     ports:
       - "8081:8081"
       - "8085:8085"

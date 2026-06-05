@@ -1,6 +1,6 @@
--Xms1024m
--Xmx1024m
--XX:MaxDirectMemorySize=768m
+-Xms256m
+-Xmx512m
+-XX:MaxDirectMemorySize=384m
 -XX:+UnlockDiagnosticVMOptions
 -XX:+LogVMOutput
 -XX:LogFile=../sonatype-work/nexus3/log/jvm.log
