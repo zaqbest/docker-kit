@@ -10,6 +10,8 @@ services:
       - ./data/elasticsearch/data:/usr/share/elasticsearch/data
       - ./certs:/usr/share/elasticsearch/config/certs:ro
       - ./elasticsearch/plugins:/usr/share/elasticsearch/plugins:ro
+      # 用户词典 / 连字模式等分析资源，analyzer 里通过 config/analysis/xxx 引用
+      - ./elasticsearch/config/analysis:/usr/share/elasticsearch/config/analysis:ro
     env_file:
       - env/elasticsearch.env
     ulimits:

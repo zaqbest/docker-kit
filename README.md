@@ -33,11 +33,15 @@ docker-kit/
 │   ├── templates/               # nginx 反代模板（envsubst 后输出到 /etc/nginx/conf.d/）
 │   └── snippets/                # ssl.conf / proxy-headers.conf
 ├── elasticsearch/
-│   └── plugins/                 # ES 插件（挂载到容器 /usr/share/elasticsearch/plugins）
-│       ├── analysis-icu/
-│       ├── analysis-kuromoji/
-│       ├── analysis-nori/
-│       └── fastfilter-elasticsearch-plugin/
+│   ├── plugins/                 # ES 插件（挂载到容器 /usr/share/elasticsearch/plugins）
+│   │   ├── analysis-icu/
+│   │   ├── analysis-ik/
+│   │   ├── analysis-kuromoji/
+│   │   ├── analysis-nori/
+│   │   └── fastfilter-elasticsearch-plugin/
+│   ├── config/
+│   │   └── analysis/            # 用户词典 / 连字模式（挂到容器 config/analysis/）
+│   └── pipelines/               # ingest pipeline 定义（es-bootstrap.sh 导入）
 ├── data/                        # 持久化数据（gitignore）
 ├── docker-compose-consul.yml
 ├── docker-compose-elasticsearch.yml
@@ -51,6 +55,7 @@ docker-kit/
 ├── docs/
 │   └── install-docker.md        # 安装 Docker / Compose 的详细指南
 └── scripts/
+    ├── es-bootstrap.sh          # ES 首启后的初始化：重置密码 + 导入 pipeline（幂等）
     └── install-docker.sh        # 一键安装 Docker + Compose（Debian/Ubuntu/CentOS/RHEL/Fedora）
 ```
 
@@ -147,19 +152,20 @@ docker compose -f docker-compose-nginx.yml up -d
 **首次启动**
 
 ```bash
-# 1. 先启 ES（数据目录为空时，ELASTIC_PASSWORD 才会生效）
-docker compose -f docker-compose-elasticsearch.yml up -d elasticsearch
+# 1. 启动 ES + Kibana
+docker compose -f docker-compose-elasticsearch.yml up -d
 
-# 2. 等 ES 就绪（约 20-30s），把 kibana_system 的密码设置成和 env 里一致
-#    推荐用 API（自签证书 SAN 里没有容器 IP，reset-password CLI 会因主机名校验失败）
-curl -k -u elastic:elastic -X POST \
-  https://localhost:9200/_security/user/kibana_system/_password \
-  -H 'Content-Type: application/json' \
-  -d '{"password":"kibana_system"}'
-
-# 3. 启动 Kibana
-docker compose -f docker-compose-elasticsearch.yml up -d kibana
+# 2. 跑一次 bootstrap：等 ES 就绪 → 重置 kibana_system 密码 → 导入 pipeline
+bash scripts/es-bootstrap.sh
 ```
+
+`es-bootstrap.sh` 是**幂等**的，每次重装或清了 `data/elasticsearch/` 之后都可以再跑一次，不会破坏已有状态。它会：
+
+1. 探活等 ES 就绪
+2. 把 `kibana_system` 密码同步到 `env/kibana.env` 里的值（走 API，不走 CLI，避开自签证书主机名校验的坑）
+3. 把 [elasticsearch/pipelines/*.json](elasticsearch/pipelines/) 全部导入为 ingest pipeline（文件名即 pipeline id）
+
+**新增 pipeline**：在 [elasticsearch/pipelines/](elasticsearch/pipelines/) 放一个 `<name>.json` 文件，内容是 pipeline body（不包含最外层的名字键），重跑 `bash scripts/es-bootstrap.sh` 即可。
 
 **访问**
 
@@ -173,11 +179,55 @@ docker compose -f docker-compose-elasticsearch.yml up -d kibana
 `elasticsearch/plugins/` 目录直接挂载到容器 `/usr/share/elasticsearch/plugins`，ES 启动时自动加载：
 
 - `analysis-icu` — ICU 分词、归一化（官方）
+- `analysis-ik` — 中文 IK 分词（第三方，`ik_smart` / `ik_max_word`）
 - `analysis-kuromoji` — 日语分词（官方）
 - `analysis-nori` — 韩语分词（官方）
 - `fastfilter-elasticsearch-plugin` — RoaringBitmap 大整数集合过滤（第三方）
 
 要新增/移除插件：把整个插件目录放入或删出 `elasticsearch/plugins/`，重启 ES 即可。插件版本必须与 ES 版本严格匹配（都必须是 8.19.14）。
+
+**用户词典与连字规则**
+
+[elasticsearch/config/analysis/](elasticsearch/config/analysis/) 挂载到容器 `config/analysis/`，供各种 analyzer 引用：
+
+- `userdict_ja.txt` — Kuromoji 日语用户词典
+- `<lang>_word_list.txt` + `<lang>_hyphenation_patterns.xml` — 丹麦语 / 荷兰语 / 德语 / 挪威语 / 瑞典语的复合词分解词典和连字模式，配合 [Hyphenation Decompounder](https://www.elastic.co/guide/en/elasticsearch/reference/current/analysis-hyp-decomp-tokenfilter.html) token filter 使用
+
+在 mapping 里引用时使用相对路径（相对 `config/`），例如：
+
+```json
+{
+  "settings": {
+    "analysis": {
+      "tokenizer": {
+        "kuromoji_user_dict": {
+          "type": "kuromoji_tokenizer",
+          "user_dictionary": "analysis/userdict_ja.txt"
+        }
+      },
+      "filter": {
+        "german_decompounder": {
+          "type": "hyphenation_decompounder",
+          "word_list_path": "analysis/german_word_list.txt",
+          "hyphenation_patterns_path": "analysis/german_hyphenation_patterns.xml"
+        }
+      }
+    }
+  }
+}
+```
+
+**验证插件加载 / 分词**
+
+```bash
+# 列出所有已加载插件
+curl -sk -u elastic:elastic 'https://localhost:9200/_cat/plugins?v'
+
+# 测试 IK 中文分词
+curl -sk -u elastic:elastic -X POST 'https://localhost:9200/_analyze' \
+  -H 'Content-Type: application/json' \
+  -d '{"analyzer":"ik_smart","text":"中华人民共和国国歌"}'
+```
 
 - 网页登录 Kibana 用 `elastic` 超管账号（密码来自 `env/elasticsearch.env` 的 `ELASTIC_PASSWORD`）。
 - Kibana 后台自己用 `kibana_system` 服务账号连 ES，密码来自 `env/kibana.env`。**8.x 禁止用 `elastic` 账号让 Kibana 连 ES**，必须走 `kibana_system` 或 service account token。
