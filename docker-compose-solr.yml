@@ -1,0 +1,20 @@
+services:
+  solr:
+    image: solr:8.11.2
+    ports:
+      - "8983:8983"
+    env_file:
+      - env/solr.env
+    depends_on:
+      - solr_zk
+    command: >
+      bash -lc "
+      solr zk mkroot -z solr_zk:2181 /ENGCD-search/cluster1 || true &&
+      solr start -f -h 198.18.0.1"
+
+  solr_zk:
+    image: zookeeper:3.9
+    ports:
+      - "2182:2181"
+    env_file:
+      - env/solr_zk.env

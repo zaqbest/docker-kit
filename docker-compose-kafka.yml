@@ -1,0 +1,17 @@
+services:
+  kafka:
+    image: 'wurstmeister/kafka:2.13-2.8.1'
+    ports:
+      - '9092:9092'
+    env_file:
+      - env/kafka.env
+    volumes:
+      - ./kafka/kafka_data:/kafka
+    depends_on:
+      - kafka_zk
+  kafka_zk:
+    image: wurstmeister/zookeeper
+    volumes:
+      - ./kafka/zk_data:/data
+    ports:
+      - '2181:2181'

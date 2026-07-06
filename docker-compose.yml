@@ -1,5 +1,4 @@
 services:
-
   # ─── Consul ───────────────────────────────────────────────────────────────
   consul_standalone:
     image: hashicorp/consul:latest
@@ -21,93 +20,6 @@ services:
       - env/consul.env
     command: "agent -server -ui -node=server-1 -bootstrap-expect=1 -client=0.0.0.0"
 
-  # ─── Kafka ────────────────────────────────────────────────────────────────
-  kafka:
-    image: 'wurstmeister/kafka:2.13-2.8.1'
-    ports:
-      - '9092:9092'
-    env_file:
-      - env/kafka.env
-    volumes:
-      - ./kafka/kafka_data:/kafka
-    depends_on:
-      - kafka_zk
-
-  kafka_zk:
-    image: wurstmeister/zookeeper
-    volumes:
-      - ./data/kafka/zk_data:/data
-    ports:
-      - '2181:2181'
-
-  # ─── MySQL ────────────────────────────────────────────────────────────────
-  mysql:
-    image: 'mysql:8.0.31'
-    container_name: mysql
-    privileged: true
-    command: ["mysqld"]
-    volumes:
-      - ./data/mysql/data/:/var/lib/mysql
-      - ./mysql/conf.d:/etc/mysql/conf.d
-      - ./mysql/my.cnf:/etc/mysql/my.cnf
-    ports:
-      - "3306:3306"
-    env_file:
-      - env/mysql.env
-
-  # ─── Nacos ────────────────────────────────────────────────────────────────
-  nacos:
-    image: 'nacos/nacos-server:v2.1.0-slim'
-    container_name: nacos
-    privileged: true
-    ports:
-      - "0.0.0.0:8848:8848"
-    env_file:
-      - env/nacos.env
-    depends_on:
-      - mysql
-
-  # ─── Nginx ────────────────────────────────────────────────────────────────
-  nginx:
-    image: nginx:alpine
-    restart: always
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx/conf.d:/etc/nginx/conf.d:ro
-      - ./nginx/certs:/etc/nginx/certs:ro
-      - ./nginx/snippets:/etc/nginx/snippets:ro
-
-  # ─── Nexus ────────────────────────────────────────────────────────────────
-  nexus:
-    image: sonatype/nexus3
-    restart: always
-    env_file:
-      - env/nexus.env
-    volumes:
-      - ./data/nexus/data:/nexus-data
-      - ./nexus/nexus.vmoptions:/opt/sonatype/nexus/bin/nexus.vmoptions:ro
-    mem_limit: 1200m
-    ports:
-      - "8081:8081"
-      - "8085:8085"
-
-  # ─── RabbitMQ ─────────────────────────────────────────────────────────────
-  rabbitmq:
-    image: 'rabbitmq:management'
-    container_name: rabbitmq
-    privileged: true
-    volumes:
-      - ./data/rabbitmq/data:/var/lib/rabbitmq
-    ports:
-      - "5672:5672"
-      - "15672:15672"
-      - "25672:25672"
-    env_file:
-      - env/rabbitmq.env
-
-  # ─── Solr ─────────────────────────────────────────────────────────────────
   solr:
     image: solr:8.11.2
     ports:
@@ -127,17 +39,3 @@ services:
       - "2182:2181"
     env_file:
       - env/zoo.env
-  # ─── Vaultwarden  ──────────────────────────────────────────────────────────
-  vault:
-    image: vaultwarden/server:latest
-    container_name: vaultwarden
-    restart: always
-    ports:
-      - 127.0.0.1:6666:80             # 仅监听本地端口，由反向代理访问
-    environment:
-      DOMAIN: https://vault.zaqbest.com # 将这里替换为你的实际域名
-      WEBSOCKET_ENABLED: "true"       # 开启 WebSocket，用于客户端实时同步
-      # SIGNUPS_ALLOWED: "false"      # 关闭公开注册，生效需要删除前面的 #
-      INVITATIONS_ALLOWED: "false"    # 关闭邀请功能
-    volumes:
-      - ./data/vault/data:/data

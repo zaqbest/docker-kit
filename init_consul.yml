@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+mkdir -p consul_standalone/data
+mkdir -p consul_standalone/config
+chown -R 100:100 consul_standalone/data
+chown -R 100:100 consul_standalone/config

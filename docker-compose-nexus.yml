@@ -1,0 +1,13 @@
+services:
+  nexus:
+    image: sonatype/nexus3
+    restart: always
+    env_file:
+      - env/nexus.env
+    volumes:
+      - ./nexus/data:/nexus-data
+      - ./nexus/nexus.vmoptions:/opt/sonatype/nexus/bin/nexus.vmoptions:ro
+    mem_limit: 1200m
+    ports:
+      - "8081:8081"
+      - "8085:8085"
