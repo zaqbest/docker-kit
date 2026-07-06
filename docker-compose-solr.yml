@@ -5,6 +5,9 @@ services:
       - "${SOLR_HTTP_PORT}:8983"
     env_file:
       - env/solr.env
+    volumes:
+      # Solr 数据（cores、config、logs）—— /var/solr 是官方镜像的数据主目录
+      - ./solr/data:/var/solr
     depends_on:
       - solr_zk
     command: >
@@ -18,3 +21,7 @@ services:
       - "${SOLR_ZK_PORT}:2181"
     env_file:
       - env/solr_zk.env
+    volumes:
+      # Zookeeper 状态：/data 存快照，/datalog 存事务日志
+      - ./solr/zk/data:/data
+      - ./solr/zk/datalog:/datalog

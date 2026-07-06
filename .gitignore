@@ -1,1 +1,14 @@
+# 各服务的持久化数据（bind mount 到宿主机的 data 目录）
+consul_standalone/data/
+elasticsearch/data/
+h2/data/
+kafka/data/
+kafka/zk_data/
+mysql/data/
+nexus/data/
+solr/data/
+solr/zk/data/
+solr/zk/datalog/
+
+# 旧的聚合 data 目录（如果历史遗留有残留也一并忽略）
 data/

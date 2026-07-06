@@ -7,6 +7,6 @@ services:
       - "${H2_TCP_PORT}:1521"   # TCP (JDBC) 端口
       - "${H2_WEB_PORT}:81"     # Web Console
     volumes:
-      - ./data/h2:/opt/h2-data
+      - ./h2/data:/opt/h2-data
     env_file:
       - env/h2.env

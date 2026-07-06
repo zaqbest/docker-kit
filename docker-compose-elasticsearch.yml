@@ -7,7 +7,7 @@ services:
       - "${ELASTICSEARCH_HTTP_PORT}:9200"
       - "${ELASTICSEARCH_TRANSPORT_PORT}:9300"
     volumes:
-      - ./data/elasticsearch/data:/usr/share/elasticsearch/data
+      - ./elasticsearch/data:/usr/share/elasticsearch/data
       - ./certs:/usr/share/elasticsearch/config/certs:ro
       - ./elasticsearch/plugins:/usr/share/elasticsearch/plugins:ro
       # 用户词典 / 连字模式等分析资源，analyzer 里通过 config/analysis/xxx 引用

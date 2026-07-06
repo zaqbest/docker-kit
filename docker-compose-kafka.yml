@@ -9,7 +9,7 @@ services:
       # advertised listener 走域名，从根 .env 注入
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://${KAFKA_HOSTNAME}:${KAFKA_PORT}
     volumes:
-      - ./kafka/kafka_data:/kafka
+      - ./kafka/data:/kafka
     depends_on:
       - kafka_zk
   kafka_zk:

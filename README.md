@@ -41,8 +41,9 @@ docker-kit/
 │   │   └── fastfilter-elasticsearch-plugin/
 │   ├── config/
 │   │   └── analysis/            # 用户词典 / 连字模式（挂到容器 config/analysis/）
-│   └── pipelines/               # ingest pipeline 定义（es-bootstrap.sh 导入）
-├── data/                        # 持久化数据（gitignore）
+│   ├── pipelines/               # ingest pipeline 定义（es-bootstrap.sh 导入）
+│   └── data/                    # ES 索引数据（gitignore）
+├── <service>/data/              # 每个有状态服务的持久化目录（gitignore，见"数据持久化"章节）
 ├── docker-compose-consul.yml
 ├── docker-compose-elasticsearch.yml
 ├── docker-compose-h2.yml
@@ -135,6 +136,32 @@ docker compose -f docker-compose-<service>.yml config | grep -E 'published|targe
 - **elasticsearch**：挂载到 `/usr/share/elasticsearch/config/certs/`，开启 HTTP TLS。
 - **kibana**：挂载到 `/usr/share/kibana/config/certs/`，用来校验 ES 证书。
 
+## 数据持久化
+
+有状态服务的数据都通过 bind mount 落到宿主机的**服务自己的 `data/` 子目录**下，[.gitignore](.gitignore) 已按服务逐条忽略。容器重建（`docker compose up -d --force-recreate`）、`docker compose down` 数据都保留；只有 `rm -rf <service>/data/` 或换工作目录才会丢。
+
+| 服务 | 宿主机路径 | 容器路径 |
+|------|-----------|---------|
+| elasticsearch | `elasticsearch/data` | `/usr/share/elasticsearch/data` |
+| mysql | `mysql/data` | `/var/lib/mysql` |
+| nexus | `nexus/data` | `/nexus-data` |
+| consul | `consul_standalone/data` `consul_standalone/config` | `/consul/data` `/consul/config` |
+| kafka | `kafka/data` | `/kafka` |
+| kafka_zk | `kafka/zk_data` | `/data` |
+| h2 | `h2/data` | `/opt/h2-data` |
+| solr | `solr/data` | `/var/solr` |
+| solr_zk | `solr/zk/data` `solr/zk/datalog` | `/data` `/datalog` |
+
+无状态服务（nginx / kibana / trojan-go）不需要持久化 —— Kibana 状态存 ES 的 `.kibana*` 索引里，随 ES 数据一起备份。
+
+**离线备份**（简单，需停容器保证一致性）：
+
+```bash
+docker compose -f docker-compose-<service>.yml stop <service>
+tar czf backup-<service>-$(date +%Y%m%d).tgz <service>/data/
+docker compose -f docker-compose-<service>.yml start <service>
+```
+
 ## 服务启动
 
 ### Nginx
@@ -159,7 +186,7 @@ docker compose -f docker-compose-elasticsearch.yml up -d
 bash scripts/es-bootstrap.sh
 ```
 
-`es-bootstrap.sh` 是**幂等**的，每次重装或清了 `data/elasticsearch/` 之后都可以再跑一次，不会破坏已有状态。它会：
+`es-bootstrap.sh` 是**幂等**的，每次重装或清了 `elasticsearch/data/` 之后都可以再跑一次，不会破坏已有状态。它会：
 
 1. 探活等 ES 就绪
 2. 把 `kibana_system` 密码同步到 `env/kibana.env` 里的值（走 API，不走 CLI，避开自签证书主机名校验的坑）
@@ -234,7 +261,7 @@ curl -sk -u elastic:elastic -X POST 'https://localhost:9200/_analyze' \
 
 **重置 / 换密码**
 
-- `ELASTIC_PASSWORD` 只在数据目录（`data/elasticsearch/data/`）为空的**首启**时生效，改完 env 重启不会同步已有实例。
+- `ELASTIC_PASSWORD` 只在数据目录（`elasticsearch/data/`）为空的**首启**时生效，改完 env 重启不会同步已有实例。
 - 要换 `elastic` 密码：
   ```bash
   curl -k -u elastic:<旧密码> -X POST \
@@ -245,7 +272,7 @@ curl -sk -u elastic:elastic -X POST 'https://localhost:9200/_analyze' \
 - 要完全从头来：
   ```bash
   docker compose -f docker-compose-elasticsearch.yml down
-  rm -rf data/elasticsearch
+  rm -rf elasticsearch/data
   # 重新按"首次启动"步骤
   ```
 
@@ -282,9 +309,26 @@ docker compose -f docker-compose-trojan-go.yml    up -d
 
 各服务的环境变量在 `env/*.env` 里，按需修改。
 
+### Solr 首次启动
+
+Solr 官方镜像的 `/var/solr` 目录里带了初始化种子（`solr.xml`、`zoo.cfg` 等），bind mount 一个空目录到 `/var/solr` 会遮住这些种子文件，导致 `Solr home directory /var/solr/data not found!`。首次启动前需要从镜像里**播种**一次：
+
+```bash
+# 1. 从镜像拷出 /var/solr 内容到宿主机的挂载点
+docker run --rm -v $(pwd)/solr/data:/target solr:8.11.2 \
+  bash -c 'cp -a /var/solr/. /target/'
+
+# 2. 正常启动
+docker compose -f docker-compose-solr.yml up -d
+```
+
+Solr Web UI：http://198.18.0.1:8983/solr/（compose 里 `command` 把 host 绑定成 `198.18.0.1`；宿主机可访问）。
+
+Zookeeper 端不需要播种，官方镜像会自动初始化空 `/data` 目录。
+
 ### H2 数据库
 
-- 数据持久化到 `data/h2/`
+- 数据持久化到 `h2/data/`
 - 默认账号：`SA` / （密码为空）
 - TCP (JDBC) 端口：`9093`（见 `.env` 的 `H2_TCP_PORT`）
 - Web Console：http://localhost:8082（见 `.env` 的 `H2_WEB_PORT`）
@@ -299,7 +343,7 @@ jdbc:h2:tcp://localhost:9093/./test
 
 **Web Console 使用**
 
-浏览器打开 http://localhost:8081，JDBC URL 填 `jdbc:h2:/opt/h2-data/<数据库名>`（例如 `jdbc:h2:/opt/h2-data/test`），User Name 填 `SA`，Password 留空，点 Connect。数据库文件会创建在容器内的 `/opt/h2-data`，映射到宿主 `data/h2/`。
+浏览器打开 http://localhost:8081，JDBC URL 填 `jdbc:h2:/opt/h2-data/<数据库名>`（例如 `jdbc:h2:/opt/h2-data/test`），User Name 填 `SA`，Password 留空，点 Connect。数据库文件会创建在容器内的 `/opt/h2-data`，映射到宿主 `h2/data/`。
 
 ### Trojan-Go
 
