@@ -1,0 +1,35 @@
+{
+  "run_type": "server",
+  "local_addr": "0.0.0.0",
+  "local_port": 443,
+  "remote_addr": "__TROJAN_GO_FALLBACK_HOST__",
+  "remote_port": "__TROJAN_GO_FALLBACK_PORT__",
+  "log_level": 1,
+  "password": [
+    "__TROJAN_GO_PASSWORD__"
+  ],
+  "ssl": {
+    "cert": "/etc/trojan-go/certs/server.crt",
+    "key": "/etc/trojan-go/certs/server.key",
+    "sni": "__TROJAN_GO_HOSTNAME__",
+    "alpn": [
+      "http/1.1"
+    ],
+    "reuse_session": true,
+    "session_ticket": true
+  },
+  "tcp": {
+    "prefer_ipv4": true,
+    "no_delay": true,
+    "keep_alive": true,
+    "fast_open": false
+  },
+  "websocket": {
+    "enabled": false,
+    "path": "/ws",
+    "host": "__TROJAN_GO_HOSTNAME__"
+  },
+  "router": {
+    "enabled": false
+  }
+}

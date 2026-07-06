@@ -1,4 +1,4 @@
-  services:
+services:
   mysql:
     image: 'mysql:8.0.31'
     container_name: mysql
@@ -9,6 +9,6 @@
       - ./mysql/conf.d:/etc/mysql/conf.d
       - ./mysql/my.cnf:/etc/mysql/my.cnf
     ports:
-      - "3306:3306"
+      - "${MYSQL_PORT}:3306"
     env_file:
       - env/mysql.env

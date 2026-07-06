@@ -1,0 +1,12 @@
+services:
+  h2:
+    image: oscarfonts/h2:latest
+    container_name: h2
+    restart: always
+    ports:
+      - "${H2_TCP_PORT}:1521"   # TCP (JDBC) 端口
+      - "${H2_WEB_PORT}:81"     # Web Console
+    volumes:
+      - ./data/h2:/opt/h2-data
+    env_file:
+      - env/h2.env

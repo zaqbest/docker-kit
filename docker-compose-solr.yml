@@ -2,7 +2,7 @@ services:
   solr:
     image: solr:8.11.2
     ports:
-      - "8983:8983"
+      - "${SOLR_HTTP_PORT}:8983"
     env_file:
       - env/solr.env
     depends_on:
@@ -15,6 +15,6 @@ services:
   solr_zk:
     image: zookeeper:3.9
     ports:
-      - "2182:2181"
+      - "${SOLR_ZK_PORT}:2181"
     env_file:
       - env/solr_zk.env

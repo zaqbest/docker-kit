@@ -1,10 +1,11 @@
 # Nexus Repository Manager
 # 证书：certs/server.crt + server.key（所有服务共用同一套证书，nginx 和 elasticsearch 等共享）
-# 新增其他服务时，在 nginx/conf.d/ 下创建对应的 .conf 文件即可
+# 域名从根 .env 注入：${NEXUS_HOSTNAME}
+# 容器启动时 nginx 自动 envsubst 生成 /etc/nginx/conf.d/nexus.conf。
 
 server {
     listen 443 ssl;
-    server_name nexus.zaqbest.com;
+    server_name ${NEXUS_HOSTNAME};
 
     include /etc/nginx/snippets/ssl.conf;
 
@@ -23,6 +24,6 @@ server {
 
 server {
     listen 80;
-    server_name nexus.zaqbest.com;
+    server_name ${NEXUS_HOSTNAME};
     return 301 https://$host$request_uri;
 }
