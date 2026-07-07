@@ -11,8 +11,9 @@ services:
       - TZ=Asia/Shanghai
       # --- 数据库连接配置 ---
       - DANMUAPI_DATABASE__TYPE=mysql
-      - DANMUAPI_DATABASE__HOST=mysql
-      - DANMUAPI_DATABASE__PORT=3306
+      # host.docker.internal 指向宿主机；Linux 上需要下面的 extra_hosts 才可用
+      - DANMUAPI_DATABASE__HOST=host.docker.internal
+      - DANMUAPI_DATABASE__PORT=${MYSQL_PORT}
       - DANMUAPI_DATABASE__NAME=danmuapi
       # !!! 重要：请使用上面mysql容器相同的用户名和密码 !!!
       - DANMUAPI_DATABASE__USER=danmuapi
@@ -35,9 +36,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     ports:
       - "7768:7768"
-    networks:
-      - misaka-net
-
-networks:
-  misaka-net:
-    driver: bridge
+    extra_hosts:
+      # Linux 上让 host.docker.internal 解析到宿主机 docker 网桥 IP
+      # macOS / Windows 的 Docker Desktop 已内置此 DNS，这行是幂等的
+      - "host.docker.internal:host-gateway"
