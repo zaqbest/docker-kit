@@ -3,6 +3,8 @@ services:
     image: oscarfonts/h2:latest
     container_name: h2
     restart: always
+    networks:
+      - docker-kit-network
     ports:
       - "${H2_TCP_PORT}:1521"   # TCP (JDBC) 端口
       - "${H2_WEB_PORT}:81"     # Web Console
@@ -10,3 +12,7 @@ services:
       - ./h2/data:/opt/h2-data
     env_file:
       - env/h2.env
+
+networks:
+  docker-kit-network:
+    external: true

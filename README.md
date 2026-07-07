@@ -56,9 +56,45 @@ docker-kit/
 ├── docs/
 │   └── install-docker.md        # 安装 Docker / Compose 的详细指南
 └── scripts/
+    ├── create-network.sh       # 创建所有独立 compose 共用的 Docker external network
     ├── es-bootstrap.sh          # ES 首启后的初始化：重置密码 + 导入 pipeline（幂等）
     └── install-docker.sh        # 一键安装 Docker + Compose（Debian/Ubuntu/CentOS/RHEL/Fedora）
 ```
+
+## Docker 网络
+
+本仓库采用“一个服务一个 compose 文件”的方式管理服务。为了让不同 compose 文件启动的容器可以通过服务名互相访问，所有服务统一接入同一个 Docker external network：
+
+```text
+docker-kit-network
+```
+
+首次启动任意服务前，先创建公共网络：
+
+```bash
+bash scripts/create-network.sh
+```
+
+脚本是幂等的：网络已存在时不会重复创建。也可以手动执行等价命令：
+
+```bash
+docker network create docker-kit-network
+```
+
+统一网络后的访问规则：
+
+- **容器访问容器**：使用 `服务名:容器内部端口`，例如 `mysql:3306`、`nexus:8081`、`nginx:80`
+- **宿主机访问容器**：使用 `localhost:宿主机映射端口`，端口来自根目录 [.env](.env)
+- **容器访问宿主机服务**：才使用 `host.docker.internal`
+
+例如 nginx 反代 Nexus 时使用 Docker 内部 DNS 解析服务名：
+
+```nginx
+resolver 127.0.0.11 valid=30s;
+set $upstream_nexus http://nexus:8081;
+```
+
+其中 `nexus:8081` 只有在 nginx 和 nexus 都接入 `docker-kit-network` 后才能正常工作。
 
 ## 端口管理
 
@@ -110,6 +146,7 @@ docker compose -f docker-compose-<service>.yml config | grep -E 'published|targe
 |------|--------|------|
 | `BASE_DOMAIN` | `zaqbest.com` | 基础域名 |
 | `NEXUS_HOSTNAME` | `nexus.zaqbest.com` | nginx `server_name`，反代到 nexus 容器 |
+| `DANMU_HOSTNAME` | `danmu.zaqbest.com` | nginx `server_name`，反代到 danmu-server 容器 |
 | `KAFKA_HOSTNAME` | `kafka.zaqbest.com` | Kafka `advertised.listeners`，客户端连接用 |
 | `TROJAN_GO_HOSTNAME` | `trojan.zaqbest.com` | Trojan-Go SNI，客户端需与之匹配 |
 
@@ -125,7 +162,7 @@ docker compose -f docker-compose-<service>.yml config | grep -E 'published|targe
 **本机访问**：这些域名指向宿主机，需要在 macOS 的 `/etc/hosts` 加：
 
 ```
-127.0.0.1  nexus.zaqbest.com kafka.zaqbest.com
+127.0.0.1  nexus.zaqbest.com danmu.zaqbest.com kafka.zaqbest.com
 ```
 
 ## 证书
@@ -164,13 +201,21 @@ docker compose -f docker-compose-<service>.yml start <service>
 
 ## 服务启动
 
+首次启动服务前，请先创建所有独立 compose 共用的 Docker 网络：
+
+```bash
+bash scripts/create-network.sh
+```
+
+之后各服务可以按需单独启动。
+
 ### Nginx
 
 ```bash
 docker compose -f docker-compose-nginx.yml up -d
 ```
 
-在 `nginx/conf.d/` 下加 `.conf` 即可接入新的反代域名。
+nginx 已接入 `docker-kit-network`，可以通过服务名反代同一网络里的其他容器，例如 `nexus:8081`。在 `nginx/templates/` 下加 `.conf.template` 即可接入新的反代域名。
 
 ### Elasticsearch + Kibana（8.19.14）
 
@@ -298,6 +343,8 @@ ELASTICSEARCH_SERVICEACCOUNTTOKEN=<上面输出的 token>
 ### 其他服务
 
 ```bash
+bash scripts/create-network.sh
+
 docker compose -f docker-compose-consul.yml       up -d
 docker compose -f docker-compose-h2.yml           up -d
 docker compose -f docker-compose-kafka.yml        up -d
@@ -308,6 +355,21 @@ docker compose -f docker-compose-trojan-go.yml    up -d
 ```
 
 各服务的环境变量在 `env/*.env` 里，按需修改。
+
+容器间互访请优先使用服务名和容器内部端口，例如：
+
+| 目标服务 | 容器内访问地址 |
+|---|---|
+| mysql | `mysql:3306` |
+| nexus | `nexus:8081` |
+| nginx | `nginx:80` / `nginx:443` |
+| elasticsearch | `elasticsearch:9200` |
+| kibana | `kibana:5601` |
+| solr | `solr:8983` |
+| kafka | `kafka:9092` |
+| consul | `consul_standalone:8500` |
+| h2 | `h2:1521` |
+| danmu-api | `danmu-api:9321` |
 
 ### Solr 首次启动
 

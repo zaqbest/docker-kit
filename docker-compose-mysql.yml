@@ -3,6 +3,8 @@ services:
     image: 'mysql:8.0.31'
     container_name: mysql
     privileged: true
+    networks:
+      - docker-kit-network
     volumes:
       - ./mysql/data/:/var/lib/mysql
       - ./mysql/conf.d:/etc/mysql/conf.d
@@ -31,3 +33,7 @@ services:
       - "${MYSQL_PORT}:3306"
     env_file:
       - env/mysql.env
+
+networks:
+  docker-kit-network:
+    external: true

@@ -1,6 +1,8 @@
 services:
   kafka:
     image: 'wurstmeister/kafka:2.13-2.8.1'
+    networks:
+      - docker-kit-network
     ports:
       - '${KAFKA_PORT}:9092'
     env_file:
@@ -14,7 +16,13 @@ services:
       - kafka_zk
   kafka_zk:
     image: wurstmeister/zookeeper
+    networks:
+      - docker-kit-network
     volumes:
       - ./kafka/zk_data:/data
     ports:
       - '${KAFKA_ZK_PORT}:2181'
+
+networks:
+  docker-kit-network:
+    external: true
