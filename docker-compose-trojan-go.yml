@@ -3,6 +3,8 @@ services:
     image: p4gefau1t/trojan-go:latest
     container_name: trojan-go
     restart: always
+    networks:
+      - docker-kit-network
     ports:
       # 宿主端口从 .env 取，容器内固定 443
       - "${TROJAN_GO_PORT}:443"
@@ -30,3 +32,7 @@ services:
             -e "s|\"__TROJAN_GO_FALLBACK_PORT__\"|$${TROJAN_GO_FALLBACK_PORT}|g" \
             /etc/trojan-go/config.template.json > /tmp/config.json
         exec trojan-go -config /tmp/config.json
+
+networks:
+  docker-kit-network:
+    external: true

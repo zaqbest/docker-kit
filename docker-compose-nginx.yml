@@ -2,16 +2,23 @@ services:
   nginx:
     image: nginx:alpine
     restart: always
+    networks:
+      - docker-kit-network
     ports:
       - "${NGINX_HTTP_PORT}:80"
       - "${NGINX_HTTPS_PORT}:443"
     environment:
       # 只替换白名单里的变量，避免 $host、$request_uri 等 nginx 内置变量被 envsubst 干掉
-      NGINX_ENVSUBST_FILTER_VARIABLES: "BASE_DOMAIN NEXUS_HOSTNAME"
+      NGINX_ENVSUBST_FILTER_VARIABLES: "BASE_DOMAIN NEXUS_HOSTNAME DANMU_HOSTNAME"
       BASE_DOMAIN: ${BASE_DOMAIN}
       NEXUS_HOSTNAME: ${NEXUS_HOSTNAME}
+      DANMU_HOSTNAME: ${DANMU_HOSTNAME}
     volumes:
       # templates/*.template 会由官方镜像的启动脚本 envsubst 后输出到 /etc/nginx/conf.d/
       - ./nginx/templates:/etc/nginx/templates:ro
       - ./certs:/etc/nginx/certs:ro
       - ./nginx/snippets:/etc/nginx/snippets:ro
+
+networks:
+  docker-kit-network:
+    external: true
