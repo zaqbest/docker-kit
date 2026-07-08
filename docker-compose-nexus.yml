@@ -6,10 +6,15 @@ services:
       - docker-kit-network
     env_file:
       - env/nexus.env
+    environment:
+      # 兜底：某些 Nexus 版本会忽略 mount 的 vmoptions，用 install4j 环境变量再套一遍确保生效
+      INSTALL4J_ADD_VM_PARAMS: "-Xms256m -Xmx512m -XX:MaxDirectMemorySize=192m -XX:MaxMetaspaceSize=256m -XX:ReservedCodeCacheSize=96m"
     volumes:
       - ./nexus/data:/nexus-data
       - ./nexus/nexus.vmoptions:/opt/sonatype/nexus/bin/nexus.vmoptions:ro
-    mem_limit: 1200m
+    # JVM 总承诺 ~1050m (512+192+256+96) + 线程栈/native ~200m ≈ 1250m
+    # mem_limit 给 1500m，留 ~250m 应付启动峰值
+    mem_limit: 1500m
     ports:
       - "${NEXUS_HTTP_PORT}:8081"
       - "${NEXUS_DOCKER_PORT}:8085"

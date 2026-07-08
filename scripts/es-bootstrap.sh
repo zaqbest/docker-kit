@@ -60,7 +60,7 @@ wait_ready() {
     sleep 2
     (( retries-- ))
   done
-  err "ES 在 120s 内没有就绪，请检查 'docker logs elasticsearch'"
+  err "ES 在 120s 内没有就绪，请检查 'docker compose -f docker-compose-elasticsearch.yml logs elasticsearch'"
   exit 1
 }
 

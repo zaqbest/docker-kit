@@ -1,7 +1,6 @@
 services:
   trojan-go:
     image: p4gefau1t/trojan-go:latest
-    container_name: trojan-go
     restart: always
     networks:
       - docker-kit-network

@@ -1,7 +1,6 @@
 services:
-  consul_standalone:
+  consul:
     image: hashicorp/consul:latest
-    container_name: consul-server
     restart: always
     networks:
       - docker-kit-network
@@ -15,8 +14,8 @@ services:
       - "${CONSUL_SERF_WAN_PORT}:8302"       # Serf WAN
       - "${CONSUL_SERF_WAN_PORT}:8302/udp"   # Serf WAN (UDP)
     volumes:
-      - ./consul_standalone/data:/consul/data
-      - ./consul_standalone/config:/consul/config
+      - ./consul/data:/consul/data
+      - ./consul/config:/consul/config
     env_file:
       - env/consul.env
     command: "agent -server -ui -node=server-1 -bootstrap-expect=1 -client=0.0.0.0"

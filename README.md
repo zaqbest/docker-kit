@@ -183,7 +183,7 @@ docker compose -f docker-compose-<service>.yml config | grep -E 'published|targe
 | elasticsearch | `elasticsearch/data` | `/usr/share/elasticsearch/data` |
 | mysql | `mysql/data` | `/var/lib/mysql` |
 | nexus | `nexus/data` | `/nexus-data` |
-| consul | `consul_standalone/data` `consul_standalone/config` | `/consul/data` `/consul/config` |
+| consul | `consul/data` `consul/config` | `/consul/data` `/consul/config` |
 | kafka | `kafka/data` | `/kafka` |
 | kafka_zk | `kafka/zk_data` | `/data` |
 | h2 | `h2/data` | `/opt/h2-data` |
@@ -328,7 +328,7 @@ curl -sk -u elastic:elastic -X POST 'https://localhost:9200/_analyze' \
 
 ```bash
 # ES 首启后跑一次，生成 token
-docker exec elasticsearch \
+docker compose -f docker-compose-elasticsearch.yml exec elasticsearch \
   bin/elasticsearch-service-tokens create elastic/kibana docker-kit
 # 输出: SERVICE_TOKEN elastic/kibana/docker-kit = AAEAAWVsYXN0...
 ```
@@ -368,7 +368,7 @@ docker compose -f docker-compose-trojan-go.yml    up -d
 | kibana | `kibana:5601` |
 | solr | `solr:8983` |
 | kafka | `kafka:9092` |
-| consul | `consul_standalone:8500` |
+| consul | `consul:8500` |
 | h2 | `h2:1521` |
 | danmu-api | `danmu-api:9321` |
 
@@ -426,7 +426,7 @@ Trojan 协议代理，把流量伪装成 TLS。镜像用社区常用的 [p4gefau
    ```
 4. 查看日志：
    ```bash
-   docker logs -f trojan-go
+   docker compose -f docker-compose-trojan-go.yml logs -f trojan-go
    ```
 
 **模板机制**
