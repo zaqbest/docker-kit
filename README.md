@@ -87,6 +87,7 @@ docker-kit/
 | h2 | `H2_TCP_PORT` | 9093 | 1521 | JDBC |
 |    | `H2_WEB_PORT` | 8082 | 81 | Web Console |
 | trojan-go | `TROJAN_GO_PORT` | 8443 | 443 | Trojan (TLS) |
+| danmu-server | `DANMU_SERVER_PORT` | 7768 | 7768 | Misaka 弹幕 API |
 
 **改端口**
 

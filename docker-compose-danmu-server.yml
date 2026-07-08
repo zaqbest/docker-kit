@@ -35,7 +35,7 @@ services:
       # Docker 套接字映射 - 用于一键更新功能
       - /var/run/docker.sock:/var/run/docker.sock
     ports:
-      - "7768:7768"
+      - "${DANMU_SERVER_PORT}:7768"
     extra_hosts:
       # Linux 上让 host.docker.internal 解析到宿主机 docker 网桥 IP
       # macOS / Windows 的 Docker Desktop 已内置此 DNS，这行是幂等的
