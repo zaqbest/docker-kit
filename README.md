@@ -13,6 +13,15 @@ sudo bash scripts/install-docker.sh -y --mirror cn   # 国内网络 + 自动化
 
 支持 Debian / Ubuntu / CentOS / RHEL / Rocky / AlmaLinux / Fedora。详情见 [docs/install-docker.md](docs/install-docker.md)。macOS / Windows 请装 [Docker Desktop](https://www.docker.com/products/docker-desktop/)。
 
+**小内存机器（≤ 8GB）建议加 swap 兜底**，防止 JVM 服务（nexus / ES）启动峰值撞满 RAM 被 OOM Kill：
+
+```bash
+sudo bash scripts/init-swap.sh                       # 默认 2G swap + swappiness=10
+sudo SWAP_SIZE_GB=4 bash scripts/init-swap.sh        # 自定义大小
+```
+
+幂等，重复跑安全。swappiness=10 意味着只有物理内存快满时才用 swap，日常不影响性能。
+
 ## 目录结构
 
 ```
@@ -58,6 +67,7 @@ docker-kit/
 └── scripts/
     ├── create-network.sh       # 创建所有独立 compose 共用的 Docker external network
     ├── es-bootstrap.sh          # ES 首启后的初始化：重置密码 + 导入 pipeline（幂等）
+    ├── init-swap.sh             # 小内存机器创建 swap 文件（幂等）
     └── install-docker.sh        # 一键安装 Docker + Compose（Debian/Ubuntu/CentOS/RHEL/Fedora）
 ```
 

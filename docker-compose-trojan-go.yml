@@ -17,6 +17,7 @@ services:
       - ./trojan-go/config.template.json:/etc/trojan-go/config.template.json:ro
       # 复用仓库共享的自签证书。生产环境请换 Let's Encrypt 证书。
       - ./certs:/etc/trojan-go/certs:ro
+    mem_limit: 128m
     # 启动时把模板里的占位符替换成 env 值（$$ 是 docker-compose 里 $ 的转义，
     # 让 sed 在容器 shell 里读环境变量而不是被 compose 二次插值），
     # 生成 /tmp/config.json 再交给 trojan-go。
