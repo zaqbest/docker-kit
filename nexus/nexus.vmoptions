@@ -15,8 +15,6 @@
 -Dkaraf.data=../sonatype-work/nexus3
 -Dkaraf.log=../sonatype-work/nexus3/log
 -Djava.io.tmpdir=../sonatype-work/nexus3/tmp
--Djava.util.prefs.userRoot=../sonatype-work/nexus3/javaprefs
--Djava.util.prefs.systemRoot=../sonatype-work/nexus3/javaprefs
 -Dkaraf.startLocalConsole=false
 -Djdk.tls.ephemeralDHKeySize=2048
 -Djdk.tls.rejectClientInitiatedRenegotiation=true

@@ -9,7 +9,9 @@ services:
     environment:
       # 兜底：某些 Nexus 版本会忽略 mount 的 vmoptions，用 install4j 环境变量再套一遍确保生效
       # 注意：Nexus 启动脚本硬编码 MaxDirectMemorySize 下限 256m，低于会拒启
-      INSTALL4J_ADD_VM_PARAMS: "-Xms256m -Xmx512m -XX:MaxDirectMemorySize=256m -XX:MaxMetaspaceSize=256m -XX:ReservedCodeCacheSize=96m"
+      # -Djava.util.prefs.userRoot 修 EULA / HealthCheck 插件的 "Could not lock User prefs" WARN
+      #   （容器里 nexus 用户 HOME 只读，JDK 默认在 ~/.java/.userPrefs 加锁会失败）
+      INSTALL4J_ADD_VM_PARAMS: "-Xms256m -Xmx512m -XX:MaxDirectMemorySize=256m -XX:MaxMetaspaceSize=256m -XX:ReservedCodeCacheSize=96m -Djava.util.prefs.userRoot=/nexus-data/javaprefs -Djava.util.prefs.systemRoot=/nexus-data/javaprefs"
     volumes:
       - ./nexus/data:/nexus-data
       - ./nexus/nexus.vmoptions:/opt/sonatype/nexus/bin/nexus.vmoptions:ro
