@@ -11,7 +11,7 @@ services:
       - DANMUAPI_DATABASE__TYPE=mysql
       # 容器间通过统一 Docker network 访问 mysql 服务名，端口使用容器内部端口
       - DANMUAPI_DATABASE__HOST=mysql
-      - DANMUAPI_DATABASE__PORT=${MYSQL_PORT}
+      - DANMUAPI_DATABASE__PORT=3306
       - DANMUAPI_DATABASE__NAME=danmuapi
       # !!! 重要：请使用上面mysql容器相同的用户名和密码 !!!
       - DANMUAPI_DATABASE__USER=danmuapi
