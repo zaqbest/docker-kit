@@ -178,11 +178,25 @@ docker compose -f docker-compose-<service>.yml config | grep -E 'published|targe
 
 ## 证书
 
-`certs/server.crt` + `server.key` 是自签证书，所有需要 TLS 的服务共用同一套：
+`certs/server.crt` + `server.key` 是 `*.zaqbest.com` 通配符证书（Let's Encrypt 签发，有效期 90 天），所有需要 TLS 的服务共用同一套：
 
 - **nginx**：挂载到 `/etc/nginx/certs/`，在 `nginx/snippets/ssl.conf` 里引用。
 - **elasticsearch**：挂载到 `/usr/share/elasticsearch/config/certs/`，开启 HTTP TLS。
 - **kibana**：挂载到 `/usr/share/kibana/config/certs/`，用来校验 ES 证书。
+
+### 有效期检查
+
+Let's Encrypt / ZeroSSL 签的证书都是 90 天有效期，用 [scripts/check-certs.sh](scripts/check-certs.sh) 随时查剩余天数：
+
+```bash
+./scripts/check-certs.sh              # 详细输出
+./scripts/check-certs.sh --quiet      # 只输出关键信息，适合 shell rc / crontab
+WARN_DAYS=45 ./scripts/check-certs.sh # 自定义提醒阈值（默认 30 天）
+```
+
+退出码：`0` 健康 · `1` 需要续期 · `2` 已过期或读取失败。
+
+剩余天数进入警戒区时，脚本会打印完整的 `acme.sh + Cloudflare DNS-01` 续期步骤，跟着做即可（一次性配好 `CF_Token` 后，`acme.sh` 自己也会写 crontab 帮你自动续，不过我们这里选手工节奏）。续完 `docker compose restart nginx trojan-go elasticsearch kibana` 让服务重新加载。
 
 ## 数据持久化
 
