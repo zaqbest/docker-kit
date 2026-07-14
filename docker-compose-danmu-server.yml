@@ -1,6 +1,6 @@
 services:
   danmu-server:
-    image: l429609201/misaka_danmu_server:latest
+    image: l429609201/misaka_danmu_server:v2.8.1
     restart: unless-stopped
     environment:
       - PUID=1000

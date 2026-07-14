@@ -1,6 +1,6 @@
 services:
   consul:
-    image: hashicorp/consul:latest
+    image: hashicorp/consul:1.22.7
     restart: always
     networks:
       - docker-kit-network

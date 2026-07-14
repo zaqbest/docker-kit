@@ -1,6 +1,6 @@
 services:
   nexus:
-    image: sonatype/nexus3
+    image: sonatype/nexus3:3.94.0
     restart: always
     networks:
       - docker-kit-network

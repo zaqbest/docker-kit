@@ -1,6 +1,6 @@
 services:
   nginx:
-    image: nginx:alpine
+    image: nginx:1.30.3-alpine
     restart: always
     networks:
       - docker-kit-network

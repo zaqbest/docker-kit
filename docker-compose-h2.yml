@@ -1,6 +1,6 @@
 services:
   h2:
-    image: oscarfonts/h2:latest
+    image: oscarfonts/h2:2.3.232
     restart: always
     networks:
       - docker-kit-network

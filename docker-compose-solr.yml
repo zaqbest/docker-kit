@@ -18,7 +18,7 @@ services:
       solr start -f -h 198.18.0.1"
 
   solr_zk:
-    image: zookeeper:3.9
+    image: zookeeper:3.9.3
     networks:
       - docker-kit-network
     ports:

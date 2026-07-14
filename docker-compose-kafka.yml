@@ -1,27 +1,34 @@
 services:
   kafka:
-    image: 'wurstmeister/kafka:2.13-2.8.1'
+    # Bitnami legacy 镜像，跨平台（arm64/v8 + amd64），与 SAP bizx 本地开发环境对齐：
+    #   https://hub.docker.com/r/bitnamilegacy/kafka
+    #   https://github.com/bitnami/containers/blob/main/bitnami/kafka/README.md
+    # 3.8.1 版本对齐 SAP bizx ivy-versions.properties。
+    image: bitnamilegacy/kafka:3.8.1
+    # 不设 container_name，交给 compose 自动生成（docker-kit-kafka-1），
+    # 避免与 SAP bizx 本地开发环境同名冲突。
+    # hostname 保留为 kafka，供 KRaft 内部 listener 解析用。
+    hostname: kafka
+    restart: always
     networks:
       - docker-kit-network
     ports:
       - '${KAFKA_PORT}:9092'
+    expose:
+      - 9092
+      - 9093
     env_file:
       - env/kafka.env
     environment:
-      # advertised listener 走域名，从根 .env 注入
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://${KAFKA_HOSTNAME}:${KAFKA_PORT}
+      # 外部 advertised listener 走 .env 里的域名/端口，
+      # 供宿主机 / 其它 network 上的客户端连接。
+      KAFKA_CFG_ADVERTISED_LISTENERS: SASL_PLAINTEXT://${KAFKA_HOSTNAME}:${KAFKA_PORT}
     volumes:
-      - ./kafka/data:/kafka
-    depends_on:
-      - kafka_zk
-  kafka_zk:
-    image: wurstmeister/zookeeper
-    networks:
-      - docker-kit-network
-    volumes:
-      - ./kafka/zk_data:/data
-    ports:
-      - '${KAFKA_ZK_PORT}:2181'
+      - ./kafka/data:/bitnami/kafka
+    deploy:
+      resources:
+        limits:
+          memory: ${KAFKA_MEMORY:-2G}
 
 networks:
   docker-kit-network:
