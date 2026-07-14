@@ -26,9 +26,11 @@ sudo SWAP_SIZE_GB=4 bash scripts/init-swap.sh        # 自定义大小
 
 ```
 docker-kit/
-├── certs/                       # 共享 TLS 证书（nginx、elasticsearch、kibana 复用）
-│   ├── server.crt
-│   └── server.key
+├── certs/                       # 共享 TLS 证书（nginx、elasticsearch、kibana 等复用）
+│   ├── server.crt               # fullchain（leaf + intermediate + root）
+│   ├── server.key
+│   └── ca/
+│       └── public-ca.crt        # intermediate + root（由 acme.sh --ca-file 生成，备用）
 ├── env/                         # 每个服务的环境变量
 │   ├── consul.env
 │   ├── elasticsearch.env
@@ -65,6 +67,7 @@ docker-kit/
 ├── docs/
 │   └── install-docker.md        # 安装 Docker / Compose 的详细指南
 └── scripts/
+    ├── check-certs.sh          # 检查 TLS 证书有效期 / 私钥匹配（macOS + Linux 兼容）
     ├── create-network.sh       # 创建所有独立 compose 共用的 Docker external network
     ├── es-bootstrap.sh          # ES 首启后的初始化：重置密码 + 导入 pipeline（幂等）
     ├── init-swap.sh             # 小内存机器创建 swap 文件（幂等）
@@ -125,8 +128,7 @@ set $upstream_nexus http://nexus:8081;
 |       | `NEXUS_DOCKER_PORT` | 8085 | 8085 | Docker Registry |
 | solr | `SOLR_HTTP_PORT` | 8983 | 8983 | Solr UI |
 |      | `SOLR_ZK_PORT` | 2182 | 2181 | Solr Zookeeper |
-| kafka | `KAFKA_PORT` | 9092 | 9092 | Kafka |
-|       | `KAFKA_ZK_PORT` | 2181 | 2181 | Kafka Zookeeper |
+| kafka | `KAFKA_PORT` | 9092 | 9092 | Kafka (KRaft，无外部 ZK) |
 | elasticsearch | `ELASTICSEARCH_HTTP_PORT` | 9200 | 9200 | REST |
 |               | `ELASTICSEARCH_TRANSPORT_PORT` | 9300 | 9300 | 节点间通信 |
 | kibana | `KIBANA_PORT` | 5601 | 5601 | Web UI |
@@ -182,21 +184,70 @@ docker compose -f docker-compose-<service>.yml config | grep -E 'published|targe
 
 - **nginx**：挂载到 `/etc/nginx/certs/`，在 `nginx/snippets/ssl.conf` 里引用。
 - **elasticsearch**：挂载到 `/usr/share/elasticsearch/config/certs/`，开启 HTTP TLS。
-- **kibana**：挂载到 `/usr/share/kibana/config/certs/`，用来校验 ES 证书。
+- **kibana**：挂载到 `/usr/share/kibana/config/certs/`，同时用作自己的 HTTPS 证书，连 ES 时走 Node.js 系统信任库校验。
+- **trojan-go**：挂载到 `/etc/trojan-go/certs/`。
+
+`certs/ca/public-ca.crt` 是同一次 `acme.sh --install-cert --ca-file` 顺手落下来的 CA 束（intermediate + root），当前未在配置里引用，留着备用（内网严格审计场景可以塞进 `ELASTICSEARCH_SSL_CERTIFICATEAUTHORITIES`）。
+
+### 签发 / 续期（acme.sh + Cloudflare DNS-01）
+
+一次性安装 acme.sh：
+
+```bash
+curl -sSfL https://get.acme.sh | sh -s email=你的邮箱
+```
+
+配置 Cloudflare API Token（推荐，比 Global API Key 权限窄）：
+
+```bash
+# 在 https://dash.cloudflare.com/profile/api-tokens 建 Custom Token
+#   权限：Zone.Zone:Read + Zone.DNS:Edit
+#   Zone Resources：Include Specific zone zaqbest.com
+export CF_Token='你的_API_Token'
+export CF_Account_ID='你的_Cloudflare_Account_ID'
+```
+
+签发（首次）：
+
+```bash
+acme.sh --register-account -m 你的邮箱 --server letsencrypt
+
+acme.sh --issue --dns dns_cf \
+  -d zaqbest.com -d '*.zaqbest.com' \
+  --keylength 2048 \
+  --server letsencrypt
+```
+
+安装到本仓库，并配好续期后的自动 reload —— **只需要跑一次**，之后 acme.sh 自己写的 crontab 会每天检查并自动续、自动重启：
+
+```bash
+cd /path/to/docker-kit
+
+acme.sh --install-cert -d zaqbest.com \
+  --key-file       "$(pwd)/certs/server.key" \
+  --fullchain-file "$(pwd)/certs/server.crt" \
+  --ca-file        "$(pwd)/certs/ca/public-ca.crt" \
+  --reloadcmd      "cd $(pwd) && \
+                    docker compose -f docker-compose-elasticsearch.yml restart kibana elasticsearch && \
+                    docker compose -f docker-compose-nginx.yml    restart nginx && \
+                    docker compose -f docker-compose-trojan-go.yml restart trojan-go"
+```
+
+> ⚠️ acme.sh 用 **域名后缀** 区分密钥类型：`--keylength 2048/3072/4096` 存到 `~/.acme.sh/zaqbest.com/`，ECC（默认）存到 `~/.acme.sh/zaqbest.com_ecc/`。查询/安装/续期时**不加 `--ecc` 就是 RSA，加 `--ecc` 就是 ECC**，混用容易查到旧的那份。
 
 ### 有效期检查
 
-Let's Encrypt / ZeroSSL 签的证书都是 90 天有效期，用 [scripts/check-certs.sh](scripts/check-certs.sh) 随时查剩余天数：
+用 [scripts/check-certs.sh](scripts/check-certs.sh) 随时查剩余天数：
 
 ```bash
-./scripts/check-certs.sh              # 详细输出
-./scripts/check-certs.sh --quiet      # 只输出关键信息，适合 shell rc / crontab
+./scripts/check-certs.sh              # 详细输出（subject / issuer / SAN / 私钥是否匹配）
+./scripts/check-certs.sh --quiet      # 一行结果，适合塞进 shell rc / crontab
 WARN_DAYS=45 ./scripts/check-certs.sh # 自定义提醒阈值（默认 30 天）
 ```
 
 退出码：`0` 健康 · `1` 需要续期 · `2` 已过期或读取失败。
 
-剩余天数进入警戒区时，脚本会打印完整的 `acme.sh + Cloudflare DNS-01` 续期步骤，跟着做即可（一次性配好 `CF_Token` 后，`acme.sh` 自己也会写 crontab 帮你自动续，不过我们这里选手工节奏）。续完 `docker compose restart nginx trojan-go elasticsearch kibana` 让服务重新加载。
+进入警戒区时脚本会打印完整的续期命令；一般不需要手工干预 —— acme.sh 的 crontab 会自动续期并按 `--reloadcmd` 重启相关服务。
 
 ## 数据持久化
 
@@ -208,8 +259,7 @@ WARN_DAYS=45 ./scripts/check-certs.sh # 自定义提醒阈值（默认 30 天）
 | mysql | `mysql/data` | `/var/lib/mysql` |
 | nexus | `nexus/data` | `/nexus-data` |
 | consul | `consul/data` `consul/config` | `/consul/data` `/consul/config` |
-| kafka | `kafka/data` | `/kafka` |
-| kafka_zk | `kafka/zk_data` | `/data` |
+| kafka | `kafka/data` | `/bitnami/kafka` |
 | h2 | `h2/data` | `/opt/h2-data` |
 | solr | `solr/data` | `/var/solr` |
 | solr_zk | `solr/zk/data` `solr/zk/datalog` | `/data` `/datalog` |
@@ -259,7 +309,7 @@ bash scripts/es-bootstrap.sh
 `es-bootstrap.sh` 是**幂等**的，每次重装或清了 `elasticsearch/data/` 之后都可以再跑一次，不会破坏已有状态。它会：
 
 1. 探活等 ES 就绪
-2. 把 `kibana_system` 密码同步到 `env/kibana.env` 里的值（走 API，不走 CLI，避开自签证书主机名校验的坑）
+2. 把 `kibana_system` 密码同步到 `env/kibana.env` 里的值（走 API，不走 CLI，避开容器间 TLS 主机名校验的坑）
 3. 把 [elasticsearch/pipelines/*.json](elasticsearch/pipelines/) 全部导入为 ingest pipeline（文件名即 pipeline id）
 
 **新增 pipeline**：在 [elasticsearch/pipelines/](elasticsearch/pipelines/) 放一个 `<name>.json` 文件，内容是 pipeline body（不包含最外层的名字键），重跑 `bash scripts/es-bootstrap.sh` 即可。
@@ -478,7 +528,7 @@ Trojan 协议代理，把流量伪装成 TLS。镜像用社区常用的 [p4gefau
    - `TROJAN_GO_HOSTNAME` — SNI 主机名，客户端要一致；默认 `trojan.zaqbest.com`
    - `TROJAN_GO_PORT` — 宿主机监听端口，默认 8443
    - `TROJAN_GO_FALLBACK_HOST` / `TROJAN_GO_FALLBACK_PORT` — 非 Trojan 流量转发去处（伪装网站）；默认转到本仓库的 nginx 容器
-2. 保证证书 [certs/server.crt](certs/server.crt) / [certs/server.key](certs/server.key) 的 SAN 覆盖 SNI 主机名（当前证书是 `*.zaqbest.com` 通配）
+2. 保证证书 [certs/server.crt](certs/server.crt) / [certs/server.key](certs/server.key) 的 SAN 覆盖 SNI 主机名（当前证书是 `*.zaqbest.com` 通配，由 Let's Encrypt 签发）
 3. 启动：
    ```bash
    docker compose -f docker-compose-trojan-go.yml up -d
@@ -508,6 +558,6 @@ trojan 协议要求配一个"伪装 web 站点"，任何不带正确密码的探
 | 端口 | 8443（或你在 `.env` 里改的值） |
 | 密码 | [.env](.env) 里的 `TROJAN_GO_PASSWORD` |
 | SNI | 与服务端 `ssl.sni` 一致 |
-| 跳过证书校验 | 自签证书需勾选；生产证书不需要 |
+| 跳过证书校验 | 老版自签证书需勾选；当前 Let's Encrypt 通配证书不需要 |
 
 **用途提示**：本仓库把 Trojan-Go 放进来是为了在自己的服务器上快速拉起代理服务（个人科学上网、跨区域测试等合法用途）。请在符合当地法律与服务条款的前提下使用。

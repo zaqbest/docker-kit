@@ -3,7 +3,6 @@ consul_standalone/data/
 elasticsearch/data/
 h2/data/
 kafka/data/
-kafka/zk_data/
 mysql/data/
 nexus/data/
 solr/data/
