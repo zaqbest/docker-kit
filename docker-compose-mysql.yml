@@ -13,15 +13,20 @@ services:
       - '--collation-server=utf8mb4_unicode_ci'
       - '--binlog_expire_logs_seconds=259200'
       - '--default-authentication-plugin=mysql_native_password'
-      # --- 小内存优化配置 ---
-      - '--innodb_buffer_pool_size=128M'           # InnoDB缓冲池大小 (默认128M,可根据内存调整)
-      - '--innodb_log_file_size=32M'               # 日志文件大小
-      - '--innodb_log_buffer_size=8M'              # 日志缓冲区大小
-      - '--max_connections=50'                     # 最大连接数 (默认151,减少到50)
-      - '--table_open_cache=64'                    # 表缓存 (默认4000,减少到64)
+      # --- 4G+ 服务器稳定性配置 ---
+      - '--innodb_buffer_pool_size=512M'           # InnoDB 缓冲池，降低查询过程中磁盘抖动
+      - '--innodb_log_file_size=64M'               # 日志文件大小
+      - '--innodb_log_buffer_size=16M'             # 日志缓冲区大小
+      - '--max_connections=100'                    # 最大连接数
+      - '--table_open_cache=256'                   # 表缓存
       - '--performance_schema=OFF'                 # 关闭性能监控 (节省内存)
       - '--innodb_flush_log_at_trx_commit=2'       # 日志刷新策略 (提升性能,略降安全性)
       - '--innodb_flush_method=O_DIRECT'           # 绕过操作系统缓存
+      - '--max_allowed_packet=64M'                 # 避免较大查询/写入包导致连接断开
+      - '--wait_timeout=28800'                     # 降低空闲连接被过早关闭概率
+      - '--interactive_timeout=28800'              # 降低交互连接被过早关闭概率
+      - '--net_read_timeout=120'                   # 查询过程中网络读取超时
+      - '--net_write_timeout=120'                  # 查询过程中网络写入超时
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -uroot -p$${MYSQL_ROOT_PASSWORD}"]
       interval: 5s
@@ -32,7 +37,7 @@ services:
       - "${MYSQL_PORT}:3306"
     env_file:
       - env/mysql.env
-    mem_limit: 512m
+    mem_limit: 1g
 
 networks:
   docker-kit-network:

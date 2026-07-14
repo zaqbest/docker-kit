@@ -367,6 +367,41 @@ docker compose -f docker-compose-trojan-go.yml    up -d
 
 各服务的环境变量在 `env/*.env` 里，按需修改。
 
+### MySQL 与 Danmu Server 连接说明
+
+`danmu-server` 和 `mysql` 都接入 `docker-kit-network`，因此应用容器内访问 MySQL 使用服务名和容器内部端口：
+
+```yaml
+DANMUAPI_DATABASE__HOST=mysql
+DANMUAPI_DATABASE__PORT=3306
+```
+
+不要在容器间通信里使用 `${MYSQL_PORT}` 或 `host.docker.internal`。`${MYSQL_PORT}` 是宿主机映射端口，主要给宿主机访问 MySQL 使用。
+
+如果遇到类似下面的错误：
+
+```text
+asyncmy.errors.OperationalError: (2013, 'Lost connection to MySQL server during query')
+```
+
+优先检查 MySQL 是否重启、OOM 或连接超时：
+
+```bash
+docker compose -f docker-compose-mysql.yml logs --tail=200 mysql
+docker inspect mysql --format '{{.State.OOMKilled}}'
+docker compose -f docker-compose-danmu-server.yml exec danmu-server sh -lc 'getent hosts mysql && nc -vz mysql 3306'
+docker compose -f docker-compose-mysql.yml exec mysql mysqladmin ping -uroot -p
+```
+
+当前 MySQL compose 已按 4G+ 服务器做了较稳妥的参数配置，包括 `512M` InnoDB buffer pool、`1g` 容器内存限制、较大的 `max_allowed_packet`，以及更宽松的 MySQL 网络读写/空闲超时。
+
+修改 MySQL 参数后需要重建 MySQL 容器生效：
+
+```bash
+docker compose -f docker-compose-mysql.yml up -d --force-recreate
+docker compose -f docker-compose-danmu-server.yml up -d --force-recreate
+```
+
 容器间互访请优先使用服务名和容器内部端口，例如：
 
 | 目标服务 | 容器内访问地址 |
