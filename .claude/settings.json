@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:hub.docker.com)",
+      "Bash(openssl x509 *)",
+      "Bash(chmod +x /Users/C5388584/PanDevelop/tools/docker-kit/scripts/check-certs.sh)",
+      "Bash(/Users/C5388584/PanDevelop/tools/docker-kit/scripts/check-certs.sh)",
+      "Bash(WARN_DAYS=100 /Users/C5388584/PanDevelop/tools/docker-kit/scripts/check-certs.sh --quiet)",
+      "Read(//Users/C5388584/.acme.sh/**)",
+      "Read(//Users/C5388584/.acme.sh/zaqbest.com_ecc/**)",
+      "Read(//Users/C5388584/.acme.sh/zaqbest.com/**)",
+      "Bash(openssl storeutl *)",
+      "Bash(find /Users/C5388584/PanDevelop -type f -name \"H2ServerConfig.java\" 2>/dev/null | head -5)",
+      "Read(//Users/C5388584/PanDevelop/**)",
+      "Bash(find /Users/C5388584/PanDevelop -type d -name \"platform-card-svc\" 2>/dev/null | head -5; find /Users/C5388584 -type f -name \"H2ServerConfig.java\" 2>/dev/null | head -5)",
+      "Read(//Users/C5388584/**)",
+      "WebSearch"
+    ]
+  }
+}

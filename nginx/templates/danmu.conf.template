@@ -1,5 +1,5 @@
 # Misaka Danmu Server
-# 证书：certs/server.crt + server.key（所有服务共用同一套证书）
+# 证书：由 ${DANMU_SSL_PROFILE} 选择（letsencrypt / selfsigned），对应 certs/<profile>/server.{crt,key}
 # 域名从根 .env 注入：${DANMU_HOSTNAME}
 # 容器启动时 nginx 自动 envsubst 生成 /etc/nginx/conf.d/danmu.conf。
 
@@ -7,7 +7,7 @@ server {
     listen 443 ssl;
     server_name ${DANMU_HOSTNAME};
 
-    include /etc/nginx/snippets/ssl.conf;
+    include /etc/nginx/snippets/ssl-${DANMU_SSL_PROFILE}.conf;
 
     # Danmu Server 常规 Web/API 请求体限制
     client_max_body_size 100m;

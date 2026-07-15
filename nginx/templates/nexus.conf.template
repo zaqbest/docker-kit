@@ -1,5 +1,5 @@
 # Nexus Repository Manager
-# 证书：certs/server.crt + server.key（所有服务共用同一套证书，nginx 和 elasticsearch 等共享）
+# 证书：由 ${NEXUS_SSL_PROFILE} 选择（letsencrypt / selfsigned），对应 certs/<profile>/server.{crt,key}
 # 域名从根 .env 注入：${NEXUS_HOSTNAME}
 # 容器启动时 nginx 自动 envsubst 生成 /etc/nginx/conf.d/nexus.conf。
 
@@ -7,7 +7,7 @@ server {
     listen 443 ssl;
     server_name ${NEXUS_HOSTNAME};
 
-    include /etc/nginx/snippets/ssl.conf;
+    include /etc/nginx/snippets/ssl-${NEXUS_SSL_PROFILE}.conf;
 
     # 允许上传大文件（Maven artifact）
     client_max_body_size 1g;

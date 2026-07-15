@@ -15,6 +15,11 @@ services:
       - ./elasticsearch/config/analysis:/usr/share/elasticsearch/config/analysis:ro
     env_file:
       - env/elasticsearch.env
+    environment:
+      # 由 ${ES_SSL_PROFILE} 选择证书套件（letsencrypt / selfsigned）
+      # 对应 certs/<profile>/server.{crt,key}
+      xpack.security.http.ssl.certificate: certs/${ES_SSL_PROFILE:-letsencrypt}/server.crt
+      xpack.security.http.ssl.key: certs/${ES_SSL_PROFILE:-letsencrypt}/server.key
     ulimits:
       memlock:
         soft: -1
@@ -34,6 +39,13 @@ services:
       - ./certs:/usr/share/kibana/config/certs:ro
     env_file:
       - env/kibana.env
+    environment:
+      # 由 ${KIBANA_SSL_PROFILE} 选择证书套件
+      SERVER_SSL_CERTIFICATE: /usr/share/kibana/config/certs/${KIBANA_SSL_PROFILE:-letsencrypt}/server.crt
+      SERVER_SSL_KEY: /usr/share/kibana/config/certs/${KIBANA_SSL_PROFILE:-letsencrypt}/server.key
+      # Kibana→ES 的 CA 信任链：letsencrypt 场景不显式配（走 Node.js Mozilla 信任库，
+      # 见 env/kibana.env 注释）；selfsigned 场景请用 docker-compose-elasticsearch.selfsigned.yml
+      # override 追加 ELASTICSEARCH_SSL_CERTIFICATEAUTHORITIES。
     depends_on:
       - elasticsearch
 

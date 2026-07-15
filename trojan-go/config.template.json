@@ -9,8 +9,8 @@
     "__TROJAN_GO_PASSWORD__"
   ],
   "ssl": {
-    "cert": "/etc/trojan-go/certs/server.crt",
-    "key": "/etc/trojan-go/certs/server.key",
+    "cert": "/etc/trojan-go/certs/__TROJAN_GO_SSL_PROFILE__/server.crt",
+    "key": "/etc/trojan-go/certs/__TROJAN_GO_SSL_PROFILE__/server.key",
     "sni": "__TROJAN_GO_HOSTNAME__",
     "alpn": [
       "http/1.1"

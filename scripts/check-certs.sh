@@ -2,17 +2,19 @@
 # ---------------------------------------------------------------------------
 # check-certs.sh
 #
-# 检查 certs/ 目录下 TLS 证书的有效期，输出剩余天数并给出续期提示。
+# 检查 certs/<profile>/ 下 TLS 证书的有效期。会遍历 certs/ 下所有子目录，
+# 每个子目录代表一个证书套件（如 letsencrypt / selfsigned）。
 #
 # 退出码：
-#   0  —— 证书剩余天数 > WARN_DAYS（默认 30），一切正常
-#   1  —— 证书剩余天数 <= WARN_DAYS 但 > 0，应尽快续期
-#   2  —— 证书已过期或读不到证书文件
+#   0  —— 所有 profile 剩余天数 > WARN_DAYS（默认 30）
+#   1  —— 至少一个 profile 剩余 <= WARN_DAYS 但 > 0
+#   2  —— 至少一个 profile 已过期或读不到证书文件
 #
 # 用法：
-#   ./scripts/check-certs.sh                # 默认阈值 30 天
-#   WARN_DAYS=45 ./scripts/check-certs.sh   # 自定义阈值
-#   ./scripts/check-certs.sh --quiet        # 只输出关键信息（适合 crontab）
+#   ./scripts/check-certs.sh                       # 检查所有 profile，阈值 30 天
+#   ./scripts/check-certs.sh letsencrypt           # 只检查指定 profile
+#   WARN_DAYS=45 ./scripts/check-certs.sh          # 自定义阈值
+#   ./scripts/check-certs.sh --quiet               # 只输出关键信息（适合 crontab）
 #
 # 建议：可以加进 shell rc，登录 shell 时提醒一下：
 #   [[ -o interactive ]] && ~/PanDevelop/tools/docker-kit/scripts/check-certs.sh --quiet
@@ -23,20 +25,31 @@ set -euo pipefail
 # --- 参数 ------------------------------------------------------------------
 WARN_DAYS="${WARN_DAYS:-30}"
 QUIET=false
+PROFILES=()
 for arg in "$@"; do
     case "$arg" in
         -q|--quiet) QUIET=true ;;
         -h|--help)
-            sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'
+            sed -n '2,22p' "$0" | sed 's/^# \{0,1\}//'
             exit 0 ;;
+        -*)
+            echo "未知参数：$arg" >&2; exit 2 ;;
+        *)
+            PROFILES+=("$arg") ;;
     esac
 done
 
 # --- 定位 certs 目录（脚本可从任意路径调用）--------------------------------
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-CERT_FILE="$REPO_ROOT/certs/server.crt"
-KEY_FILE="$REPO_ROOT/certs/server.key"
+CERTS_ROOT="$REPO_ROOT/certs"
+
+# 未指定 profile 时，扫描 certs/ 下所有含 server.crt 的子目录
+if (( ${#PROFILES[@]} == 0 )); then
+    while IFS= read -r -d '' d; do
+        PROFILES+=("$(basename "$d")")
+    done < <(find "$CERTS_ROOT" -mindepth 1 -maxdepth 1 -type d -print0 | sort -z)
+fi
 
 # --- 颜色（仅 stdout 是 tty 时启用）----------------------------------------
 if [[ -t 1 ]]; then
@@ -48,81 +61,107 @@ fi
 
 log() { $QUIET || echo "$@"; }
 
-# --- 前置检查 --------------------------------------------------------------
-if [[ ! -f "$CERT_FILE" ]]; then
-    echo "${C_RED}✗ 找不到证书文件：$CERT_FILE${C_RESET}" >&2
-    exit 2
-fi
-if [[ ! -f "$KEY_FILE" ]]; then
-    echo "${C_YELLOW}⚠ 找不到私钥文件：$KEY_FILE${C_RESET}" >&2
-fi
 if ! command -v openssl >/dev/null 2>&1; then
     echo "${C_RED}✗ 未找到 openssl，请先安装${C_RESET}" >&2
     exit 2
 fi
 
-# --- 解析证书 --------------------------------------------------------------
-# subject / issuer / SAN 都用一次 openssl 拿全，节省调用
-CERT_INFO=$(openssl x509 -in "$CERT_FILE" -noout \
-    -subject -issuer -startdate -enddate -ext subjectAltName 2>/dev/null)
+# --- 单 profile 检查 -------------------------------------------------------
+# 返回码：0 健康 / 1 需续期 / 2 过期或缺文件
+check_one_profile() {
+    local profile="$1"
+    local cert_file="$CERTS_ROOT/$profile/server.crt"
+    local key_file="$CERTS_ROOT/$profile/server.key"
 
-SUBJECT=$(sed -n 's/^subject=//p'         <<<"$CERT_INFO")
-ISSUER=$(sed  -n 's/^issuer=//p'          <<<"$CERT_INFO")
-NOT_BEFORE=$(sed -n 's/^notBefore=//p'    <<<"$CERT_INFO")
-NOT_AFTER=$(sed  -n 's/^notAfter=//p'     <<<"$CERT_INFO")
-# SAN 在 openssl 输出里跨两行，取第一行 "X509v3 Subject Alternative Name:" 之后那一行
-SAN=$(sed -n '/Subject Alternative Name/{n;s/^ *//;p;}' <<<"$CERT_INFO")
+    log ""
+    log "${C_BOLD}▎profile: $profile${C_RESET}"
 
-# 私钥与证书是否匹配（比较公钥 modulus 的 SHA256）
-KEY_MATCH="?"
-if [[ -f "$KEY_FILE" ]]; then
-    CRT_HASH=$(openssl x509 -in "$CERT_FILE" -noout -pubkey 2>/dev/null | openssl sha256 | awk '{print $NF}')
-    KEY_HASH=$(openssl pkey -in "$KEY_FILE" -pubout 2>/dev/null | openssl sha256 | awk '{print $NF}')
-    if [[ "$CRT_HASH" == "$KEY_HASH" ]]; then
-        KEY_MATCH="match"
-    else
-        KEY_MATCH="MISMATCH"
+    if [[ ! -s "$cert_file" ]]; then
+        echo "  ${C_RED}✗ 证书文件缺失或为空：$cert_file${C_RESET}" >&2
+        return 2
     fi
-fi
+    if [[ ! -s "$key_file" ]]; then
+        echo "  ${C_YELLOW}⚠ 私钥文件缺失或为空：$key_file${C_RESET}" >&2
+    fi
 
-# --- 计算剩余天数 -----------------------------------------------------------
-# macOS 的 date 不认 GNU 的 -d，做双分支兼容
-if date --version >/dev/null 2>&1; then
-    # GNU date (Linux)
-    NOT_AFTER_TS=$(date -d "$NOT_AFTER" +%s)
-else
-    # BSD date (macOS) —— openssl 输出格式形如 "Oct  8 23:59:59 2026 GMT"
-    NOT_AFTER_TS=$(TZ=UTC date -jf "%b %e %H:%M:%S %Y %Z" "$NOT_AFTER" +%s)
-fi
-NOW_TS=$(date +%s)
-DAYS_LEFT=$(( (NOT_AFTER_TS - NOW_TS) / 86400 ))
+    # subject / issuer / SAN 都用一次 openssl 拿全
+    local cert_info subject issuer not_before not_after san
+    cert_info=$(openssl x509 -in "$cert_file" -noout \
+        -subject -issuer -startdate -enddate -ext subjectAltName 2>/dev/null) || {
+        echo "  ${C_RED}✗ 证书解析失败：$cert_file${C_RESET}" >&2
+        return 2
+    }
+    subject=$(sed -n 's/^subject=//p'         <<<"$cert_info")
+    issuer=$(sed  -n 's/^issuer=//p'          <<<"$cert_info")
+    not_before=$(sed -n 's/^notBefore=//p'    <<<"$cert_info")
+    not_after=$(sed  -n 's/^notAfter=//p'     <<<"$cert_info")
+    san=$(sed -n '/Subject Alternative Name/{n;s/^ *//;p;}' <<<"$cert_info")
 
-# --- 输出 -----------------------------------------------------------------
-log ""
-log "${C_BOLD}证书信息：${C_RESET} $CERT_FILE"
-log "  ${C_DIM}Subject :${C_RESET} $SUBJECT"
-log "  ${C_DIM}Issuer  :${C_RESET} $ISSUER"
-log "  ${C_DIM}SAN     :${C_RESET} $SAN"
-log "  ${C_DIM}Valid   :${C_RESET} $NOT_BEFORE  →  $NOT_AFTER"
-if [[ "$KEY_MATCH" == "match" ]]; then
-    log "  ${C_DIM}Key     :${C_RESET} ${C_GREEN}✓ 与证书匹配${C_RESET}"
-elif [[ "$KEY_MATCH" == "MISMATCH" ]]; then
-    log "  ${C_DIM}Key     :${C_RESET} ${C_RED}✗ 与证书不匹配！${C_RESET}"
-fi
-log ""
+    # 私钥与证书是否匹配（比较公钥 SHA256）
+    local key_match="?"
+    if [[ -s "$key_file" ]]; then
+        local crt_hash key_hash
+        crt_hash=$(openssl x509 -in "$cert_file" -noout -pubkey 2>/dev/null | openssl sha256 | awk '{print $NF}')
+        key_hash=$(openssl pkey  -in "$key_file"  -pubout          2>/dev/null | openssl sha256 | awk '{print $NF}')
+        if [[ "$crt_hash" == "$key_hash" ]]; then
+            key_match="match"
+        else
+            key_match="MISMATCH"
+        fi
+    fi
 
-# --- 判定状态 --------------------------------------------------------------
-if (( DAYS_LEFT < 0 )); then
-    echo "${C_RED}${C_BOLD}✗ 证书已过期 $(( -DAYS_LEFT )) 天！${C_RESET}"
-    echo "  请立即续期，参考本脚本尾部的续期步骤。" >&2
+    # macOS 的 date 不认 GNU 的 -d，做双分支兼容
+    local not_after_ts now_ts days_left
+    if date --version >/dev/null 2>&1; then
+        not_after_ts=$(date -d "$not_after" +%s)
+    else
+        not_after_ts=$(TZ=UTC date -jf "%b %e %H:%M:%S %Y %Z" "$not_after" +%s)
+    fi
+    now_ts=$(date +%s)
+    days_left=$(( (not_after_ts - now_ts) / 86400 ))
+
+    log "  ${C_DIM}Subject :${C_RESET} $subject"
+    log "  ${C_DIM}Issuer  :${C_RESET} $issuer"
+    log "  ${C_DIM}SAN     :${C_RESET} $san"
+    log "  ${C_DIM}Valid   :${C_RESET} $not_before  →  $not_after"
+    if [[ "$key_match" == "match" ]]; then
+        log "  ${C_DIM}Key     :${C_RESET} ${C_GREEN}✓ 与证书匹配${C_RESET}"
+    elif [[ "$key_match" == "MISMATCH" ]]; then
+        log "  ${C_DIM}Key     :${C_RESET} ${C_RED}✗ 与证书不匹配！${C_RESET}"
+    fi
+
+    if (( days_left < 0 )); then
+        echo "  ${C_RED}${C_BOLD}✗ 已过期 $(( -days_left )) 天！${C_RESET}"
+        return 2
+    elif (( days_left <= WARN_DAYS )); then
+        echo "  ${C_YELLOW}${C_BOLD}⚠ 剩余 $days_left 天，建议续期（阈值 $WARN_DAYS 天）。${C_RESET}"
+        return 1
+    else
+        log "  ${C_GREEN}${C_BOLD}✓ 剩余 $days_left 天，健康。${C_RESET}"
+        $QUIET && echo "certs[$profile] OK ($days_left days left)"
+        return 0
+    fi
+}
+
+# --- 遍历所有 profile ------------------------------------------------------
+if (( ${#PROFILES[@]} == 0 )); then
+    echo "${C_RED}✗ 未在 $CERTS_ROOT 下发现任何 profile 子目录${C_RESET}" >&2
     exit 2
-elif (( DAYS_LEFT <= WARN_DAYS )); then
-    echo "${C_YELLOW}${C_BOLD}⚠ 证书还剩 $DAYS_LEFT 天，建议续期（阈值 $WARN_DAYS 天）。${C_RESET}"
-    if ! $QUIET; then
-        cat <<'EOF'
+fi
+
+worst=0
+for p in "${PROFILES[@]}"; do
+    rc=0
+    check_one_profile "$p" || rc=$?
+    if (( rc > worst )); then worst=$rc; fi
+done
+
+# --- Let's Encrypt 续期提示（只在有过期/即将过期时打印一次）----------------
+if (( worst == 1 )) && ! $QUIET; then
+    cat <<'EOF'
 
 ------------------------------------------------------------------------------
-续期步骤（Cloudflare DNS-01，需要一个 CF API Token）
+Let's Encrypt 续期步骤（Cloudflare DNS-01，需要一个 CF API Token）
 ------------------------------------------------------------------------------
 一次性安装：
     curl -sSfL https://get.acme.sh | sh -s email=acme@zaqbest.com
@@ -138,20 +177,16 @@ elif (( DAYS_LEFT <= WARN_DAYS )); then
       --keylength 2048 \
       --server letsencrypt
 
-安装到本仓库 certs/（把命令里的路径改成你本地绝对路径）：
+安装到本仓库 certs/letsencrypt/（把命令里的路径改成你本地绝对路径）：
     ~/.acme.sh/acme.sh --install-cert -d zaqbest.com \
-      --key-file       "$(pwd)/certs/server.key" \
-      --fullchain-file "$(pwd)/certs/server.crt" \
+      --key-file       "$(pwd)/certs/letsencrypt/server.key" \
+      --fullchain-file "$(pwd)/certs/letsencrypt/server.crt" \
       --reloadcmd      "docker compose -f docker-compose-nginx.yml    restart nginx    ; \
                         docker compose -f docker-compose-trojan-go.yml restart trojan-go"
 
 装完再跑一次本脚本确认。
 ------------------------------------------------------------------------------
 EOF
-    fi
-    exit 1
-else
-    log "${C_GREEN}${C_BOLD}✓ 证书剩余 $DAYS_LEFT 天，健康。${C_RESET}"
-    $QUIET && echo "certs OK ($DAYS_LEFT days left)"
-    exit 0
 fi
+
+exit "$worst"
