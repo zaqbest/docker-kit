@@ -1,0 +1,24 @@
+# SAP 静态站点
+# 证书：由 ${SAP_SSL_PROFILE} 选择（letsencrypt / selfsigned），对应 certs/<profile>/server.{crt,key}
+# 域名从根 .env 注入：${SAP_HOSTNAME}
+# 静态内容目录：nginx/html/sap 挂载到容器 /usr/share/nginx/html/sap
+
+server {
+    listen 443 ssl;
+    server_name ${SAP_HOSTNAME};
+
+    include /etc/nginx/snippets/ssl-${SAP_SSL_PROFILE}.conf;
+
+    root /usr/share/nginx/html/sap;
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ =404;
+    }
+}
+
+server {
+    listen 80;
+    server_name ${SAP_HOSTNAME};
+    return 301 https://$host$request_uri;
+}
