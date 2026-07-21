@@ -63,7 +63,6 @@ docker-kit/
 ├── docker-compose-nexus.yml
 ├── docker-compose-nginx.yml
 ├── docker-compose-solr.yml
-├── docker-compose-trojan-go.yml
 ├── docs/
 │   └── install-docker.md        # 安装 Docker / Compose 的详细指南
 └── scripts/
@@ -134,7 +133,6 @@ set $upstream_nexus http://nexus:8081;
 | kibana | `KIBANA_PORT` | 5601 | 5601 | Web UI |
 | h2 | `H2_TCP_PORT` | 9093 | 1521 | JDBC |
 |    | `H2_WEB_PORT` | 8082 | 81 | Web Console |
-| trojan-go | `TROJAN_GO_PORT` | 8443 | 443 | Trojan (TLS) |
 | danmu-server | `DANMU_SERVER_PORT` | 7768 | 7768 | Misaka 弹幕 API |
 
 **改端口**
@@ -161,7 +159,6 @@ docker compose -f docker-compose-<service>.yml config | grep -E 'published|targe
 | `NEXUS_HOSTNAME` | `nexus.zaqbest.com` | nginx `server_name`，反代到 nexus 容器 |
 | `DANMU_HOSTNAME` | `danmu.zaqbest.com` | nginx `server_name`，反代到 danmu-server 容器 |
 | `KAFKA_HOSTNAME` | `kafka.zaqbest.com` | Kafka `advertised.listeners`，客户端连接用 |
-| `TROJAN_GO_HOSTNAME` | `trojan.zaqbest.com` | Trojan-Go SNI，客户端需与之匹配 |
 
 **nginx**：反代配置放在 [nginx/templates/*.template](nginx/templates/)，容器启动时 nginx 官方镜像自动 `envsubst` 生成 `/etc/nginx/conf.d/*.conf`。只有 `NGINX_ENVSUBST_FILTER_VARIABLES` 白名单里的变量会被替换，nginx 自身的 `$host` / `$request_uri` 等不受影响。新增反代域名步骤：
 
@@ -185,7 +182,6 @@ docker compose -f docker-compose-<service>.yml config | grep -E 'published|targe
 - **nginx**：挂载到 `/etc/nginx/certs/`，在 `nginx/snippets/ssl.conf` 里引用。
 - **elasticsearch**：挂载到 `/usr/share/elasticsearch/config/certs/`，开启 HTTP TLS。
 - **kibana**：挂载到 `/usr/share/kibana/config/certs/`，同时用作自己的 HTTPS 证书，连 ES 时走 Node.js 系统信任库校验。
-- **trojan-go**：挂载到 `/etc/trojan-go/certs/`。
 
 `certs/ca/public-ca.crt` 是同一次 `acme.sh --install-cert --ca-file` 顺手落下来的 CA 束（intermediate + root），当前未在配置里引用，留着备用（内网严格审计场景可以塞进 `ELASTICSEARCH_SSL_CERTIFICATEAUTHORITIES`）。
 
@@ -229,8 +225,7 @@ acme.sh --install-cert -d zaqbest.com \
   --ca-file        "$(pwd)/certs/ca/public-ca.crt" \
   --reloadcmd      "cd $(pwd) && \
                     docker compose -f docker-compose-elasticsearch.yml restart kibana elasticsearch && \
-                    docker compose -f docker-compose-nginx.yml    restart nginx && \
-                    docker compose -f docker-compose-trojan-go.yml restart trojan-go"
+                    docker compose -f docker-compose-nginx.yml    restart nginx"
 ```
 
 > ⚠️ acme.sh 用 **域名后缀** 区分密钥类型：`--keylength 2048/3072/4096` 存到 `~/.acme.sh/zaqbest.com/`，ECC（默认）存到 `~/.acme.sh/zaqbest.com_ecc/`。查询/安装/续期时**不加 `--ecc` 就是 RSA，加 `--ecc` 就是 ECC**，混用容易查到旧的那份。
@@ -264,7 +259,7 @@ WARN_DAYS=45 ./scripts/check-certs.sh # 自定义提醒阈值（默认 30 天）
 | solr | `solr/data` | `/var/solr` |
 | solr_zk | `solr/zk/data` `solr/zk/datalog` | `/data` `/datalog` |
 
-无状态服务（nginx / kibana / trojan-go）不需要持久化 —— Kibana 状态存 ES 的 `.kibana*` 索引里，随 ES 数据一起备份。
+无状态服务（nginx / kibana）不需要持久化 —— Kibana 状态存 ES 的 `.kibana*` 索引里，随 ES 数据一起备份。
 
 **离线备份**（简单，需停容器保证一致性）：
 
@@ -426,7 +421,6 @@ docker compose -f docker-compose-kafka.yml        up -d
 docker compose -f docker-compose-mysql.yml        up -d
 docker compose -f docker-compose-nexus.yml        up -d
 docker compose -f docker-compose-solr.yml         up -d
-docker compose -f docker-compose-trojan-go.yml    up -d
 ```
 
 各服务的环境变量在 `env/*.env` 里，按需修改。
@@ -517,47 +511,3 @@ jdbc:h2:tcp://localhost:9093/./test
 
 浏览器打开 http://localhost:8081，JDBC URL 填 `jdbc:h2:/opt/h2-data/<数据库名>`（例如 `jdbc:h2:/opt/h2-data/test`），User Name 填 `SA`，Password 留空，点 Connect。数据库文件会创建在容器内的 `/opt/h2-data`，映射到宿主 `h2/data/`。
 
-### Trojan-Go
-
-Trojan 协议代理，把流量伪装成 TLS。镜像用社区常用的 [p4gefau1t/trojan-go](https://github.com/p4gefau1t/trojan-go)。
-
-**首次使用**
-
-1. 修改 [.env](.env) 里的 Trojan-Go 相关变量：
-   - `TROJAN_GO_PASSWORD` — 必须换成强密码（默认是占位符）
-   - `TROJAN_GO_HOSTNAME` — SNI 主机名，客户端要一致；默认 `trojan.zaqbest.com`
-   - `TROJAN_GO_PORT` — 宿主机监听端口，默认 8443
-   - `TROJAN_GO_FALLBACK_HOST` / `TROJAN_GO_FALLBACK_PORT` — 非 Trojan 流量转发去处（伪装网站）；默认转到本仓库的 nginx 容器
-2. 保证证书 [certs/server.crt](certs/server.crt) / [certs/server.key](certs/server.key) 的 SAN 覆盖 SNI 主机名（当前证书是 `*.zaqbest.com` 通配，由 Let's Encrypt 签发）
-3. 启动：
-   ```bash
-   docker compose -f docker-compose-trojan-go.yml up -d
-   ```
-4. 查看日志：
-   ```bash
-   docker compose -f docker-compose-trojan-go.yml logs -f trojan-go
-   ```
-
-**模板机制**
-
-[trojan-go/config.template.json](trojan-go/config.template.json) 里用 `__XXX__` 占位符，容器启动时会 `sed` 替换成环境变量的值，写到 `/tmp/config.json` 再传给 trojan-go。修改 [.env](.env) 后 `docker compose -f docker-compose-trojan-go.yml up -d --force-recreate` 生效。
-
-**fallback 说明**
-
-trojan 协议要求配一个"伪装 web 站点"，任何不带正确密码的探测流量都会被静默转发到那里，让攻击者看起来像访问了一个普通网站。默认转发到本仓库的 nginx 容器（同 docker network），跑 nginx 时就能正常工作；如果只单独跑 trojan-go，把 `TROJAN_GO_FALLBACK_HOST` 改成公网站点（比如 `www.bing.com`）+ `PORT=443` 即可。
-
-**端口**
-
-宿主机 `${TROJAN_GO_PORT}`（默认 8443，见 [.env](.env)）→ 容器 443。如果服务器 443 空着且没被 nginx 占用，可以把 `.env` 里的 `TROJAN_GO_PORT` 改成 `443` 让协议更逼真。
-
-**客户端配置要点**
-
-| 字段 | 值 |
-|------|-----|
-| 服务器 | `${TROJAN_GO_HOSTNAME}`（默认 `trojan.zaqbest.com`） |
-| 端口 | 8443（或你在 `.env` 里改的值） |
-| 密码 | [.env](.env) 里的 `TROJAN_GO_PASSWORD` |
-| SNI | 与服务端 `ssl.sni` 一致 |
-| 跳过证书校验 | 老版自签证书需勾选；当前 Let's Encrypt 通配证书不需要 |
-
-**用途提示**：本仓库把 Trojan-Go 放进来是为了在自己的服务器上快速拉起代理服务（个人科学上网、跨区域测试等合法用途）。请在符合当地法律与服务条款的前提下使用。

@@ -181,8 +181,7 @@ Let's Encrypt 续期步骤（Cloudflare DNS-01，需要一个 CF API Token）
     ~/.acme.sh/acme.sh --install-cert -d zaqbest.com \
       --key-file       "$(pwd)/certs/letsencrypt/server.key" \
       --fullchain-file "$(pwd)/certs/letsencrypt/server.crt" \
-      --reloadcmd      "docker compose -f docker-compose-nginx.yml    restart nginx    ; \
-                        docker compose -f docker-compose-trojan-go.yml restart trojan-go"
+      --reloadcmd      "docker compose -f docker-compose-nginx.yml restart nginx"
 
 装完再跑一次本脚本确认。
 ------------------------------------------------------------------------------
