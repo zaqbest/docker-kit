@@ -1,11 +1,16 @@
-# 默认兜底：所有未匹配到具体 server_name 的请求，直接返回 404。
+# 默认兜底：所有未匹配到具体 server_name 的请求，返回自定义 404 页面。
 # 文件名以 "00-" 开头，确保它是加载时的第一个 server 块，
 # 从而承担 default_server 角色，避免请求被误路由到其它站点。
 
 server {
     listen 80 default_server;
     server_name _;
-    return 404;
+
+    include /etc/nginx/snippets/error-pages.conf;
+
+    location / {
+        return 404;
+    }
 }
 
 server {
@@ -18,5 +23,9 @@ server {
     ssl_protocols       TLSv1.2 TLSv1.3;
     ssl_ciphers         HIGH:!aNULL:!MD5;
 
-    return 404;
+    include /etc/nginx/snippets/error-pages.conf;
+
+    location / {
+        return 404;
+    }
 }

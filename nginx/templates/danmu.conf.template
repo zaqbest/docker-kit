@@ -16,9 +16,16 @@ server {
     resolver 127.0.0.11 valid=30s;
     set $upstream_danmu http://danmu-server:7768;
 
+    # 接管上游返回的错误状态码，并使用自定义错误页
+    # 说明同 nexus：默认只在上游不可达时兜底 50x
+    include /etc/nginx/snippets/error-pages.conf;
+
     location / {
         proxy_pass         $upstream_danmu;
         include            /etc/nginx/snippets/proxy-headers.conf;
+
+        # 仅在上游宕机/超时时展示自定义 50x 页面
+        proxy_intercept_errors off;
     }
 }
 

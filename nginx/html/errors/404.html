@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>404 - Lost at Sea</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body {
+            height: 100%;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+                         "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+            color: #fff;
+            overflow: hidden;
+        }
+        body {
+            min-height: 100vh;
+            background: #1e88c8;
+            /* SVG 波浪纹背景，浅色叠加 */
+            background-image:
+                radial-gradient(ellipse at center, rgba(255,255,255,0.08) 0%, transparent 60%),
+                url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 100'><path d='M0 60 Q 25 40 50 60 T 100 60 T 150 60 T 200 60' stroke='%23ffffff' stroke-width='1.5' fill='none' opacity='0.15'/><path d='M0 80 Q 25 60 50 80 T 100 80 T 150 80 T 200 80' stroke='%23ffffff' stroke-width='1.5' fill='none' opacity='0.12'/></svg>");
+            background-size: auto, 240px 120px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        .art {
+            width: min(520px, 82vw);
+            height: auto;
+            margin-bottom: 24px;
+            animation: floatUp 4s ease-in-out infinite;
+        }
+        @keyframes floatUp {
+            0%, 100% { transform: translateY(0); }
+            50%      { transform: translateY(-10px); }
+        }
+        h1 {
+            font-size: clamp(20px, 4vw, 32px);
+            font-weight: 300;
+            letter-spacing: 1px;
+            text-align: center;
+            padding: 0 16px;
+        }
+        p {
+            margin-top: 12px;
+            font-size: 14px;
+            opacity: 0.75;
+            text-align: center;
+            padding: 0 16px;
+        }
+        .actions { margin-top: 28px; }
+        .btn {
+            display: inline-block;
+            padding: 10px 24px;
+            border: 1px solid rgba(255,255,255,0.6);
+            border-radius: 999px;
+            color: #fff;
+            text-decoration: none;
+            font-size: 13px;
+            letter-spacing: 1px;
+            transition: all 0.25s;
+        }
+        .btn:hover {
+            background: rgba(255,255,255,0.15);
+        }
+    </style>
+</head>
+<body>
+    <!-- 4 🧙 4 : 中间是海神 Poseidon -->
+    <svg class="art" viewBox="0 0 600 260" xmlns="http://www.w3.org/2000/svg">
+        <!-- 左侧的 4 -->
+        <text x="0" y="220" fill="#ffffff" font-family="Helvetica, Arial, sans-serif"
+              font-size="260" font-weight="700">4</text>
+        <!-- 右侧的 4 -->
+        <text x="430" y="220" fill="#ffffff" font-family="Helvetica, Arial, sans-serif"
+              font-size="260" font-weight="700">4</text>
+
+        <!-- 中间的海神 -->
+        <g transform="translate(220,40)">
+            <!-- 三叉戟 -->
+            <g stroke="#0d3b5c" stroke-width="6" fill="#0d3b5c" stroke-linecap="round">
+                <line x1="130" y1="10" x2="130" y2="200"/>
+                <path d="M110 30 L110 5 L120 15 L130 5 L140 15 L150 5 L150 30" fill="#0d3b5c" stroke-linejoin="round"/>
+            </g>
+            <!-- 王冠 -->
+            <path d="M55 20 L60 5 L70 18 L80 3 L90 18 L100 5 L105 20 Z"
+                  fill="#f4c86b" stroke="#c88e2b" stroke-width="2" stroke-linejoin="round"/>
+            <rect x="55" y="20" width="50" height="8" fill="#f4c86b" stroke="#c88e2b" stroke-width="2"/>
+            <!-- 皮肤（脸） -->
+            <ellipse cx="80" cy="55" rx="26" ry="24" fill="#f6c9a3"/>
+            <!-- 眼睛 -->
+            <circle cx="72" cy="52" r="2.4" fill="#0d3b5c"/>
+            <circle cx="88" cy="52" r="2.4" fill="#0d3b5c"/>
+            <!-- 白眉 -->
+            <path d="M65 44 Q 72 40 79 44" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round"/>
+            <path d="M81 44 Q 88 40 95 44" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round"/>
+            <!-- 大胡子 -->
+            <path d="M55 65
+                     Q 45 100 55 140
+                     Q 60 175 80 190
+                     Q 100 175 105 140
+                     Q 115 100 105 65
+                     Q 95 78 80 78
+                     Q 65 78 55 65 Z"
+                  fill="#ffffff"/>
+            <!-- 胡子上的分层线 -->
+            <path d="M65 130 Q 80 138 95 130" stroke="#e5e5e5" stroke-width="1.5" fill="none"/>
+            <path d="M60 155 Q 80 168 100 155" stroke="#e5e5e5" stroke-width="1.5" fill="none"/>
+            <!-- 手臂（右手举三叉戟） -->
+            <path d="M108 90 Q 125 90 130 105" stroke="#f6c9a3" stroke-width="14" fill="none" stroke-linecap="round"/>
+        </g>
+    </svg>
+
+    <h1>This page was lost at sea.</h1>
+    <p>你要找的页面漂到别处去了</p>
+    <div class="actions">
+        <a class="btn" href="javascript:history.back()">← 返回上一页</a>
+    </div>
+</body>
+</html>

@@ -12,6 +12,8 @@ server {
     root /usr/share/nginx/html/sap;
     index index.html;
 
+    include /etc/nginx/snippets/error-pages.conf;
+
     location / {
         try_files $uri $uri/ =404;
     }

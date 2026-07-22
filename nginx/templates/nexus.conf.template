@@ -16,9 +16,18 @@ server {
     resolver 127.0.0.11 valid=30s;
     set $upstream_nexus http://nexus:8081;
 
+    # 接管上游返回的错误状态码，并使用自定义错误页
+    # 注意：Nexus 自身也是完整应用，通常上游 404 应由 Nexus 自己处理，
+    #      这里仅在上游不可达（502/503/504）时兜底。如需完全接管所有 4xx/5xx，
+    #      可将下面改为 proxy_intercept_errors on;
+    include /etc/nginx/snippets/error-pages.conf;
+
     location / {
         proxy_pass         $upstream_nexus;
         include            /etc/nginx/snippets/proxy-headers.conf;
+
+        # 仅在上游宕机/超时时展示自定义 50x 页面
+        proxy_intercept_errors off;
     }
 }
 
